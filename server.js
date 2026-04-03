@@ -24,7 +24,58 @@ function unlockAudio() {
     console.log("Audio Unlocked");
   }).catch(e => console.error("Audio block", e));
 }
+// 1. Voice State & Audio Object
+let isVoiceEnabled = localStorage.getItem('kiyana_voice_enabled') !== 'false'; 
+const kiyanaAudio = new Audio(); // Persistent audio object
 
+// Update icons on load
+updateVoiceUI();
+
+function updateVoiceUI() {
+    document.getElementById('voiceOnIcon').style.display = isVoiceEnabled ? 'block' : 'none';
+    document.getElementById('voiceOffIcon').style.display = isVoiceEnabled ? 'none' : 'block';
+}
+
+// 2. The "Unlock" Hack for Android APKs
+// This MUST be called directly by a click event to allow future audio to play
+function unlockAudio() {
+    kiyanaAudio.src = "data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAIlYAAESsAAACABAAZGF0YQAAAAA="; 
+    kiyanaAudio.play().catch(() => {});
+}
+
+// 3. Toggle Feature
+document.getElementById('voiceToggle').onclick = () => {
+    unlockAudio(); // Important: Unlocks audio channel when they click the toggle
+    isVoiceEnabled = !isVoiceEnabled;
+    localStorage.setItem('kiyana_voice_enabled', isVoiceEnabled);
+    updateVoiceUI();
+};
+
+// 4. Modified Speak Function
+async function speak(text, forceSpeak = false, onEnd) {
+    // If voice is off AND it's not a forced call, exit
+    if (!isVoiceEnabled && !forceSpeak) {
+        if (onEnd) onEnd();
+        return;
+    }
+
+    try {
+        const res = await fetch('/api/tts', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ text })
+        });
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        
+        kiyanaAudio.src = url;
+        kiyanaAudio.onended = () => { URL.revokeObjectURL(url); if (onEnd) onEnd(); };
+        await kiyanaAudio.play();
+    } catch (e) {
+        console.error("TTS Failed", e);
+        if (onEnd) onEnd();
+    }
+}
 // Add this to your sendBtn and callBtn
 document.getElementById('sendBtn').addEventListener('click', unlockAudio);
 document.getElementById('callBtn').addEventListener('click', unlockAudio);
