@@ -13,6 +13,22 @@ app.use(cors());
 app.use(express.json({ limit: '20mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
 
+// Add this at the top of your script
+let audioUnlocked = false;
+
+function unlockAudio() {
+  if (audioUnlocked) return;
+  const silent = new Audio();
+  silent.play().then(() => {
+    audioUnlocked = true;
+    console.log("Audio Unlocked");
+  }).catch(e => console.error("Audio block", e));
+}
+
+// Add this to your sendBtn and callBtn
+document.getElementById('sendBtn').addEventListener('click', unlockAudio);
+document.getElementById('callBtn').addEventListener('click', unlockAudio);
+
 // Chat + Image Analysis
 app.post('/api/chat', async (req, res) => {
   const { message, imageBase64, history } = req.body;
