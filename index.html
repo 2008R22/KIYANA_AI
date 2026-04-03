@@ -243,7 +243,7 @@
     thinkLabel.textContent = 'Thinking';
     thinking.style.display = 'flex';
     try {
-      const res = await fetch(`${API}/api/chat`, {
+      const res = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ message: text, imageBase64: base64 || undefined, history: base64 ? undefined : buildHistory() })
@@ -381,3 +381,4 @@
 </script>
 </body>
 </html>
+
