@@ -1,4 +1,6 @@
-const API = ''; // empty = same origin (localhost:3000)
+require('dotenv').config();
+const express = require('express');
+  const API = ''; // empty = same origin (localhost:3000)
   const CHAT_KEY = 'kiyana_chat';
   const IMG_KEY = 'kiyana_imgs';
   const VOICE_SETTINGS_KEY = 'kiyana_voice_enabled';
