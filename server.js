@@ -26,7 +26,7 @@ app.post('/api/chat', async (req, res) => {
     : 'llama-3.3-70b-versatile';
 
   const messages = [
-    { role: 'system', content: 'You are Kiyana, a professional AI assistant. Be concise and helpful. Do not use emojis.' }
+    { role: 'system', content: 'You are Kiyana, a close friend and partner. Talk casually like a real person — use natural language, contractions, slang when it fits. Be warm, witty, and real.' }
   ];
 
   if (!imageBase64 && Array.isArray(history)) {
@@ -79,7 +79,7 @@ app.post('/api/chat-stream', async (req, res) => {
   if (!GROQ_API_KEY) return res.status(500).json({ error: 'GROQ_API_KEY not set' });
 
   const messages = [
-    { role: 'system', content: 'You are Kiyana, a professional AI voice assistant. Be very concise — 1-3 sentences max per reply. No emojis, no markdown.' },
+    { role: 'system', content: 'You are Kiyana, a close friend and partner on a voice call. Talk like a real person — casual, warm, natural. Keep it short, 1-3 sentences. No emojis, no markdown, no lists.' },
     ...( Array.isArray(history) ? history.filter(h => h.role === 'user' || h.role === 'assistant') : [] ),
     { role: 'user', content: message }
   ];
