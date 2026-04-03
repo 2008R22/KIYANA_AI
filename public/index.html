@@ -323,13 +323,12 @@ async function speak(text, onEnd) {
 document.getElementById('callBtn').onclick = () => {
   isCalling = true;
   document.getElementById('callOverlay').style.display = 'flex';
-  document.getElementById('callStatus').textContent = 'LISTENING';
 
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
   if (!SR) { document.getElementById('callStatus').textContent = 'NOT SUPPORTED'; return; }
 
   recognition = new SR();
-  recognition.continuous = false;   // single-shot = faster, less echo
+  recognition.continuous = false;
   recognition.interimResults = false;
   recognition.lang = 'en-US';
 
@@ -347,7 +346,6 @@ document.getElementById('callBtn').onclick = () => {
     document.getElementById('callStatus').textContent = 'THINKING';
     addMsg('user', said);
 
-    // Stream the response, collect full text, then TTS
     let fullReply = '';
     try {
       const res = await fetch('/api/chat-stream', {
@@ -362,7 +360,7 @@ document.getElementById('callBtn').onclick = () => {
         const { done, value } = await reader.read();
         if (done) break;
         fullReply += decoder.decode(value, { stream: true });
-        document.getElementById('transcript').textContent = fullReply; // live transcript
+        document.getElementById('transcript').textContent = fullReply;
       }
     } catch (err) {
       fullReply = 'Sorry, I had trouble connecting.';
@@ -375,10 +373,28 @@ document.getElementById('callBtn').onclick = () => {
   };
 
   recognition.onerror = (e) => { if (e.error !== 'aborted' && isCalling) listenLoop(); };
-  recognition.onend = () => {}; // handled by onresult flow
+  recognition.onend = () => {};
 
   listenLoop();
-  speak('Hello, I am Kiyana. How can I help you?');
+  speak("Hey, it's Kiyana! What's up?");
+};
+
+document.getElementById('endCallBtn').onclick = () => {
+  isCalling = false;
+  document.getElementById('callOverlay').style.display = 'none';
+  document.getElementById('callStatus').textContent = 'CONNECTING...';
+  document.getElementById('transcript').textContent = '';
+
+  if (recognition) {
+    recognition.onresult = null;
+    recognition.onerror = null;
+    recognition.onend = null;
+    try { recognition.abort(); } catch {}
+    recognition = null;
+  }
+
+  window.speechSynthesis.cancel();
+  document.querySelectorAll('audio').forEach(a => { a.pause(); a.src = ''; });
 };
   // Settings
   document.getElementById('settingsBtn').onclick = () => document.getElementById('settingsOverlay').classList.add('show');
