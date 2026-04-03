@@ -101,11 +101,6 @@
     <button class="icon-btn" id="settingsBtn" title="Settings">
       <svg fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
     </button>
-   <!-- Add this inside your <header> or .header-btns -->
-    <button class="icon-btn" id="voiceToggle" title="Toggle Voice">
-      <svg id="voiceOnIcon" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24" style="display: block;"><path d="M11 5L6 9H2v6h4l5 4V5zM19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>
-      <svg id="voiceOffIcon" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24" style="display: none;"><path d="M11 5L6 9H2v6h4l5 4V5zM23 9l-6 6M17 9l6 6"/></svg>
-    </button>
   </div>
 </header>
 
@@ -168,7 +163,7 @@
     <div class="about">
       <p>Crafted by</p>
       <strong>San Tech</strong>
-      <a href="/cdn-cgi/l/email-protection#582c3d3b3031Ht6TLmpMc3xhN5euPZo5ecC4RJtfJrJu8"><span class="__cf_email__" data-cfemail="fd89989e9594988e9c93ccbd9a909c9491d39e9290">[email&#160;protected]</span></a>
+      <a href="mailto:techiesan1@gmail.com">techiesan1@gmail.com</a>
     </div>
   </div>
 </div>
@@ -186,403 +181,253 @@
 </div>
 
 <script>
-  // ── Constants & State ──────────────────────────────────────────
+  const API = ''; // empty = same origin (localhost:3000)
   const CHAT_KEY = 'kiyana_chat';
-  const IMG_KEY  = 'kiyana_imgs';
+  const IMG_KEY = 'kiyana_imgs';
 
-  let messages      = JSON.parse(localStorage.getItem(CHAT_KEY) || '[]');
-  let imgHistory    = JSON.parse(localStorage.getItem(IMG_KEY)  || '[]');
+  let messages = JSON.parse(localStorage.getItem(CHAT_KEY) || '[]');
+  let imgHistory = JSON.parse(localStorage.getItem(IMG_KEY) || '[]');
   let pendingBase64 = null;
-  let isCalling     = false;
-  let recognition   = null;
-  let currentAudio  = null;
+  let isCalling = false;
+  let recognition = null;
 
-  const viewport     = document.getElementById('viewport');
-  const msgInput     = document.getElementById('msgInput');
-  const thinking     = document.getElementById('thinking');
-  const thinkLabel   = document.getElementById('thinkLabel');
-  const imgPreview   = document.getElementById('imgPreview');
+  const viewport = document.getElementById('viewport');
+  const msgInput = document.getElementById('msgInput');
+  const thinking = document.getElementById('thinking');
+  const thinkLabel = document.getElementById('thinkLabel');
+  const imgPreview = document.getElementById('imgPreview');
   const previewThumb = document.getElementById('previewThumb');
-  const callStatus   = document.getElementById('callStatus');
-  const transcriptEl = document.getElementById('transcript');
 
-  // ── Persistence ────────────────────────────────────────────────
-  function save()     { localStorage.setItem(CHAT_KEY, JSON.stringify(messages)); }
-  function saveImgs() { localStorage.setItem(IMG_KEY,  JSON.stringify(imgHistory)); }
+  function save() { localStorage.setItem(CHAT_KEY, JSON.stringify(messages)); }
+  function saveImgs() { localStorage.setItem(IMG_KEY, JSON.stringify(imgHistory)); }
 
-  // ── Helpers ────────────────────────────────────────────────────
-  function escHtml(s) {
-    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
-  }
-
-  function buildHistory() {
-    return messages
-      .filter(m => !m.isUserImg && !m.imageUrl)
-      .slice(-20)
-      .map(m => ({ role: m.role === 'user' ? 'user' : 'assistant', content: m.text }));
-  }
-
-  // ── Add Message to UI ──────────────────────────────────────────
-  // FIX: use data-url attribute + event delegation instead of inline onclick with URL
   function addMsg(role, text, imageUrl, isUserImg, fromHistory) {
     const entry = { role, text, imageUrl, isUserImg };
     if (!fromHistory) { messages.push(entry); save(); }
 
     const div = document.createElement('div');
     div.className = `msg ${role}`;
-
-    const bubble = document.createElement('div');
-    bubble.className = 'bubble';
-    bubble.textContent = text; // safe: textContent never parses HTML
-
+    let imgHtml = '';
     if (imageUrl) {
-      const wrap = document.createElement('div');
-      wrap.className = 'img-wrap';
-      const img = document.createElement('img');
-      img.src = imageUrl;
-      img.alt = isUserImg ? 'Uploaded' : 'Generated';
-      wrap.appendChild(img);
-
-      if (!isUserImg) {
-        const dlBtn = document.createElement('button');
-        dlBtn.className = 'dl-btn';
-        dlBtn.dataset.url = imageUrl; // FIX: store URL in data attr, not onclick string
-        dlBtn.innerHTML = `<svg fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" viewBox="0 0 24 24">
-          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-          <polyline points="7 10 12 15 17 10"/>
-          <line x1="12" y1="15" x2="12" y2="3"/>
-        </svg>`;
-        dlBtn.addEventListener('click', () => dlImg(imageUrl));
-        wrap.appendChild(dlBtn);
-      }
-      bubble.appendChild(wrap);
+      imgHtml = `<div class="img-wrap">
+        <img src="${imageUrl}" alt="${isUserImg ? 'Uploaded' : 'Generated'}">
+        ${!isUserImg ? `<button class="dl-btn" onclick="dlImg('${imageUrl}')">
+          <svg fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        </button>` : ''}
+      </div>`;
     }
-
-    div.appendChild(bubble);
+    div.innerHTML = `<div class="bubble">${escHtml(text)}${imgHtml}</div>`;
     viewport.appendChild(div);
     viewport.scrollTop = viewport.scrollHeight;
   }
 
-  // Load history on start
-  messages.forEach(m => addMsg(m.role, m.text, m.imageUrl, m.isUserImg, true));
-  viewport.scrollTop = viewport.scrollHeight;
-
-  // ── Download Image ─────────────────────────────────────────────
-  window.dlImg = async function(url) {
-    try {
-      if (url.startsWith('data:')) {
-        const a = document.createElement('a');
-        a.href = url; a.download = `kiyana_${Date.now()}.jpg`; a.click();
-        return;
-      }
-      const r    = await fetch(url);
-      const blob = await r.blob();
-      const a    = document.createElement('a');
-      a.href     = URL.createObjectURL(blob);
-      a.download = `kiyana_${Date.now()}.jpg`;
-      document.body.appendChild(a); a.click(); document.body.removeChild(a);
-    } catch(e) {}
-  };
-
-  // ── TTS / Speak ────────────────────────────────────────────────
-  // Single speak() — ElevenLabs via /api/tts, fallback to browser TTS
-  async function speak(text, onEnd) {
-    if (!text) { if (onEnd) onEnd(); return; }
-
-    // Stop any currently playing audio first
-    if (currentAudio) {
-      currentAudio.onended = null;
-      currentAudio.onerror = null;
-      currentAudio.pause();
-      try { URL.revokeObjectURL(currentAudio.src); } catch {}
-      currentAudio.src = '';
-      currentAudio = null;
-    }
-    window.speechSynthesis.cancel();
-
-    try {
-      const res = await fetch('/api/tts', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text })
-      });
-      if (!res.ok) throw new Error('TTS failed');
-
-      const blob  = await res.blob();
-      const url   = URL.createObjectURL(blob);
-      const audio = new Audio(url);
-      currentAudio = audio;
-
-      audio.onended = () => {
-        URL.revokeObjectURL(url);
-        if (currentAudio === audio) currentAudio = null;
-        if (onEnd) onEnd();
-      };
-      audio.onerror = () => {
-        URL.revokeObjectURL(url);
-        if (currentAudio === audio) currentAudio = null;
-        if (onEnd) onEnd();
-      };
-
-      // FIX: catch autoplay policy errors and fall through to browser TTS
-      await audio.play().catch(() => { throw new Error('Autoplay blocked'); });
-
-    } catch(err) {
-      // Fallback: browser TTS
-      currentAudio = null;
-      window.speechSynthesis.cancel();
-      const u  = new SpeechSynthesisUtterance(text);
-      u.rate   = 1.05;
-      u.onend  = () => { if (onEnd) onEnd(); };
-      u.onerror = () => { if (onEnd) onEnd(); };
-      window.speechSynthesis.speak(u);
-    }
+  function escHtml(s) {
+    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
   }
 
-  // ── Chat (text mode) ───────────────────────────────────────────
+  async function dlImg(url) {
+    try {
+      if (url.startsWith('data:')) { const a=document.createElement('a'); a.href=url; a.download=`kiyana_${Date.now()}.jpg`; a.click(); return; }
+      const r = await fetch(url); const blob = await r.blob();
+      const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `kiyana_${Date.now()}.jpg`; document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    } catch(e) {}
+  }
+
+  function buildHistory() {
+    return messages.filter(m => !m.isUserImg && !m.imageUrl).slice(-20).map(m => ({
+      role: m.role === 'user' ? 'user' : 'assistant', content: m.text
+    }));
+  }
+
   async function sendChat(text, base64) {
     thinkLabel.textContent = 'Thinking';
     thinking.style.display = 'flex';
     try {
-      const res  = await fetch('/api/chat', {
+      const res = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          message:     text,
-          imageBase64: base64 || undefined,
-          history:     base64 ? undefined : buildHistory()
-        })
+        body: JSON.stringify({ message: text, imageBase64: base64 || undefined, history: base64 ? undefined : buildHistory() })
       });
       const data = await res.json();
-      if (!res.ok || data.error) {
-        addMsg('ai', 'Error: ' + (data.error || 'Something went wrong'));
-        return null;
-      }
+      if (!res.ok || data.error) { addMsg('ai', 'Error: ' + (data.error || 'Something went wrong')); return null; }
       return data.content;
-    } catch(e) {
-      addMsg('ai', 'Connection error.');
-      return null;
-    } finally {
-      thinking.style.display = 'none';
-    }
+    } catch(e) { addMsg('ai', 'Connection error.'); return null; }
+    finally { thinking.style.display = 'none'; }
   }
 
   async function onSend() {
     const text = msgInput.value.trim();
     if (!text && !pendingBase64) return;
-    const b64    = pendingBase64;
+    const b64 = pendingBase64;
     const imgSrc = b64 ? `data:image/jpeg;base64,${b64}` : null;
     addMsg('user', text || 'Analyzing image...', imgSrc, !!b64);
     msgInput.value = ''; msgInput.style.height = 'auto';
     pendingBase64 = null; imgPreview.style.display = 'none';
     const reply = await sendChat(text, b64);
-    // FIX: don't speak() during an active call — call has its own audio flow
-    if (reply) { addMsg('ai', reply); if (!isCalling) speak(reply); }
+    if (reply) { addMsg('ai', reply); speak(reply); }
   }
 
-  // ── Image Generation ───────────────────────────────────────────
   async function onGenerate() {
     const prompt = msgInput.value.trim();
     if (!prompt) return;
     addMsg('user', 'Generate image: ' + prompt);
     msgInput.value = ''; msgInput.style.height = 'auto';
-    thinkLabel.textContent = 'Painting';
-    thinking.style.display = 'flex';
+    thinkLabel.textContent = 'Painting'; thinking.style.display = 'flex';
     try {
-      const res  = await fetch('/api/generate-image', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+      const res = await fetch(`${API}/api/generate-image`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ prompt })
       });
       const data = await res.json();
       if (!res.ok || data.error) { addMsg('ai', 'Failed: ' + (data.error || 'Unknown')); return; }
       if (data.url) {
         addMsg('ai', 'Here is your generated image.', data.url);
-        imgHistory.unshift({ url: data.url, prompt, ts: Date.now() });
-        saveImgs();
-        renderImgGrid();
+        imgHistory.unshift({ url: data.url, prompt, ts: Date.now() }); saveImgs(); renderImgGrid();
       }
-    } catch(e) {
-      addMsg('ai', 'Connection error.');
-    } finally {
-      thinking.style.display = 'none';
-    }
+    } catch(e) { addMsg('ai', 'Connection error.'); }
+    finally { thinking.style.display = 'none'; }
   }
 
-  // ── Image History Grid ─────────────────────────────────────────
-  // FIX: moved before any call that uses it (was defined after onGenerate called it)
-  function renderImgGrid() {
-    const grid = document.getElementById('imgGrid');
-    if (!imgHistory.length) {
-      grid.innerHTML = '<p class="empty">No images generated yet.</p>';
-      return;
-    }
-    grid.innerHTML = '';
-    imgHistory.forEach(item => {
-      const wrap   = document.createElement('div');
-      wrap.className = 'img-thumb';
-      const img    = document.createElement('img');
-      img.src      = item.url;
-      img.alt      = item.prompt;
-      const label  = document.createElement('p');
-      label.textContent = item.prompt;
-      const dlBtn  = document.createElement('button');
-      dlBtn.className = 'dl-btn';
-      dlBtn.style.cssText = 'position:absolute;top:6px;right:6px';
-      dlBtn.innerHTML = `<svg fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" viewBox="0 0 24 24">
-        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-        <polyline points="7 10 12 15 17 10"/>
-        <line x1="12" y1="15" x2="12" y2="3"/>
-      </svg>`;
-      dlBtn.addEventListener('click', () => dlImg(item.url));
-      wrap.appendChild(img);
-      wrap.appendChild(label);
-      wrap.appendChild(dlBtn);
-      grid.appendChild(wrap);
-    });
-  }
-
-  // ── Voice Call ─────────────────────────────────────────────────
-  document.getElementById('callBtn').onclick = () => {
-    isCalling = true;
-    document.getElementById('callOverlay').style.display = 'flex';
-    callStatus.textContent = 'CONNECTING...';
-
-    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SR) { callStatus.textContent = 'NOT SUPPORTED'; return; }
-
-    // FIX: always create a fresh recognition instance — aborted instances can't restart
-    function listenLoop() {
-      if (!isCalling) return;
-      callStatus.textContent = 'LISTENING';
-
-      if (recognition) {
-        try { recognition.abort(); } catch {}
-        recognition = null;
-      }
-
-      recognition = new SR();
-      recognition.continuous    = false;
-      recognition.interimResults = false;
-      recognition.lang          = 'en-US';
-
-      recognition.onresult = handleResult;
-      recognition.onerror  = (e) => {
-        if (!isCalling) return;
-        if (e.error === 'aborted') return; // we triggered this, ignore
-        // FIX: handle no-speech gracefully — just listen again immediately
-        if (e.error === 'no-speech') { listenLoop(); return; }
-        // Other errors: small delay then retry
-        setTimeout(listenLoop, 800);
-      };
-      // FIX: onend fires after every stop/abort — only restart if we're still
-      // in LISTENING state (i.e. we didn't get a result which manages its own flow)
-      recognition.onend = () => {
-        if (isCalling && callStatus.textContent === 'LISTENING') {
-          setTimeout(listenLoop, 300);
-        }
-      };
-
-      try {
-        recognition.start();
-      } catch(err) {
-        if (isCalling) setTimeout(listenLoop, 800);
-      }
-    }
-
-    async function handleResult(e) {
-      const said = e.results[0][0].transcript.trim();
-      if (!said) { listenLoop(); return; }
-
-      // Switch status away from LISTENING so onend doesn't re-trigger listenLoop
-      callStatus.textContent = 'THINKING';
-      transcriptEl.textContent = `"${said}"`;
-      addMsg('user', said);
-
-      // Kill mic — we don't need it while processing
-      if (recognition) {
-        recognition.onend = null;
-        try { recognition.abort(); } catch {}
-        recognition = null;
-      }
-
-      let fullReply = '';
-      try {
-        const res = await fetch('/api/chat-stream', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ message: said, history: buildHistory() })
-        });
-        const reader  = res.body.getReader();
-        const decoder = new TextDecoder();
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-          fullReply += decoder.decode(value, { stream: true });
-          transcriptEl.textContent = fullReply;
-        }
-      } catch(err) {
-        fullReply = "Sorry, I had trouble connecting.";
-      }
-
-      if (!isCalling) return;
-
-      if (fullReply) {
-        addMsg('ai', fullReply);
-        callStatus.textContent = 'SPEAKING';
-        speak(fullReply, () => { if (isCalling) listenLoop(); });
-      } else {
-        listenLoop();
-      }
-    }
-
-    // Greet first, then start listening once audio finishes
-    speak("Hey, it's Kiyana! What's up?", () => { if (isCalling) listenLoop(); });
-  };
-
-  document.getElementById('endCallBtn').onclick = () => {
-    isCalling = false;
-    document.getElementById('callOverlay').style.display = 'none';
-    callStatus.textContent  = 'CONNECTING...';
-    transcriptEl.textContent = '';
-
-    if (recognition) {
-      recognition.onresult = null;
-      recognition.onerror  = null;
-      recognition.onend    = null;
-      try { recognition.abort(); } catch {}
-      recognition = null;
-    }
-
-    if (currentAudio) {
-      currentAudio.onended = null;
-      currentAudio.onerror = null;
-      currentAudio.pause();
-      currentAudio.src = '';
-      currentAudio = null;
-    }
+  function speak(text, onEnd) {
+    if (!text) return;
     window.speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(text); u.rate = 1.05;
+    if (onEnd) u.onend = onEnd;
+    window.speechSynthesis.speak(u);
+  }
+
+  // Replace your speak() function entirely:
+async function speak(text, onEnd) {
+  if (!text) { if (onEnd) onEnd(); return; }
+  try {
+    const res = await fetch('/api/tts', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text })
+    });
+    if (!res.ok) throw new Error('TTS failed');
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const audio = new Audio(url);
+    audio.onended = () => { URL.revokeObjectURL(url); if (onEnd) onEnd(); };
+    audio.onerror = () => { if (onEnd) onEnd(); };
+    await audio.play();
+  } catch {
+    // Fallback to browser TTS if server TTS fails
+    const u = new SpeechSynthesisUtterance(text); u.rate = 1.05;
+    if (onEnd) u.onend = onEnd;
+    window.speechSynthesis.speak(u);
+  }
+}
+// Replace your entire call button handler:
+document.getElementById('callBtn').onclick = () => {
+  isCalling = true;
+  document.getElementById('callOverlay').style.display = 'flex';
+
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SR) { document.getElementById('callStatus').textContent = 'NOT SUPPORTED'; return; }
+
+  recognition = new SR();
+  recognition.continuous = false;
+  recognition.interimResults = false;
+  recognition.lang = 'en-US';
+
+  const listenLoop = () => {
+    if (!isCalling) return;
+    document.getElementById('callStatus').textContent = 'LISTENING';
+    recognition.start();
   };
 
-  // ── Settings ───────────────────────────────────────────────────
-  document.getElementById('settingsBtn').onclick    = () => document.getElementById('settingsOverlay').classList.add('show');
-  document.getElementById('closeSettings').onclick  = () => document.getElementById('settingsOverlay').classList.remove('show');
-  document.getElementById('clearChatBtn').onclick   = () => {
+  recognition.onresult = async (e) => {
+    const said = e.results[0][0].transcript.trim();
+    if (!said) { listenLoop(); return; }
+
+    document.getElementById('transcript').textContent = `"${said}"`;
+    document.getElementById('callStatus').textContent = 'THINKING';
+    addMsg('user', said);
+
+    let fullReply = '';
+    try {
+      const res = await fetch('/api/chat-stream', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: said, history: buildHistory() })
+      });
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      document.getElementById('callStatus').textContent = 'SPEAKING';
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        fullReply += decoder.decode(value, { stream: true });
+        document.getElementById('transcript').textContent = fullReply;
+      }
+    } catch (err) {
+      fullReply = 'Sorry, I had trouble connecting.';
+    }
+
+    if (fullReply) {
+      addMsg('ai', fullReply);
+      speak(fullReply, () => { if (isCalling) listenLoop(); });
+    } else if (isCalling) listenLoop();
+  };
+
+  recognition.onerror = (e) => { if (e.error !== 'aborted' && isCalling) listenLoop(); };
+  recognition.onend = () => {};
+
+  listenLoop();
+  speak("Hey, it's Kiyana! What's up?");
+};
+
+document.getElementById('endCallBtn').onclick = () => {
+  isCalling = false;
+  document.getElementById('callOverlay').style.display = 'none';
+  document.getElementById('callStatus').textContent = 'CONNECTING...';
+  document.getElementById('transcript').textContent = '';
+
+  if (recognition) {
+    recognition.onresult = null;
+    recognition.onerror = null;
+    recognition.onend = null;
+    try { recognition.abort(); } catch {}
+    recognition = null;
+  }
+
+  window.speechSynthesis.cancel();
+  document.querySelectorAll('audio').forEach(a => { a.pause(); a.src = ''; });
+};
+  // Settings
+  document.getElementById('settingsBtn').onclick = () => document.getElementById('settingsOverlay').classList.add('show');
+  document.getElementById('closeSettings').onclick = () => document.getElementById('settingsOverlay').classList.remove('show');
+  document.getElementById('clearChatBtn').onclick = () => {
     messages = []; save(); viewport.innerHTML = '';
     document.getElementById('settingsOverlay').classList.remove('show');
     addMsg('ai', 'Memory cleared.');
   };
 
-  // ── Image History ──────────────────────────────────────────────
-  document.getElementById('historyBtn').onclick       = () => { renderImgGrid(); document.getElementById('historyOverlay').classList.add('show'); };
-  document.getElementById('closeHistory').onclick     = () => document.getElementById('historyOverlay').classList.remove('show');
-  document.getElementById('clearImgHistory').onclick  = () => { imgHistory = []; saveImgs(); renderImgGrid(); };
+  // Image history
+  document.getElementById('historyBtn').onclick = () => { renderImgGrid(); document.getElementById('historyOverlay').classList.add('show'); };
+  document.getElementById('closeHistory').onclick = () => document.getElementById('historyOverlay').classList.remove('show');
+  document.getElementById('clearImgHistory').onclick = () => { imgHistory = []; saveImgs(); renderImgGrid(); };
 
-  // ── Modal backdrop close ───────────────────────────────────────
-  document.getElementById('settingsOverlay').onclick = (e) => { if (e.target.id === 'settingsOverlay') e.target.classList.remove('show'); };
-  document.getElementById('historyOverlay').onclick  = (e) => { if (e.target.id === 'historyOverlay')  e.target.classList.remove('show'); };
+  function renderImgGrid() {
+    const grid = document.getElementById('imgGrid');
+    if (!imgHistory.length) { grid.innerHTML = '<p class="empty">No images generated yet.</p>'; return; }
+    grid.innerHTML = imgHistory.map(item => `
+      <div class="img-thumb">
+        <img src="${item.url}" alt="${item.prompt}">
+        <p>${item.prompt}</p>
+        <button class="dl-btn" style="position:absolute;top:6px;right:6px" onclick="dlImg('${item.url}')">
+          <svg fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        </button>
+      </div>`).join('');
+  }
 
-  // ── File / Image attach ────────────────────────────────────────
+  // Close modals on backdrop click
+  document.getElementById('settingsOverlay').onclick = (e) => { if (e.target.id==='settingsOverlay') e.target.classList.remove('show'); };
+  document.getElementById('historyOverlay').onclick = (e) => { if (e.target.id==='historyOverlay') e.target.classList.remove('show'); };
+
+  // File input
   document.getElementById('analyzeBtn').onclick = () => document.getElementById('fileInput').click();
   document.getElementById('fileInput').onchange = (e) => {
     const file = e.target.files[0]; if (!file) return;
@@ -593,17 +438,19 @@
       imgPreview.style.display = 'flex';
       msgInput.focus();
     };
-    reader.readAsDataURL(file);
-    e.target.value = '';
+    reader.readAsDataURL(file); e.target.value = '';
   };
   document.getElementById('clearImg').onclick = () => { pendingBase64 = null; imgPreview.style.display = 'none'; };
 
-  // ── Input bar ──────────────────────────────────────────────────
-  document.getElementById('genBtn').onclick  = onGenerate;
+  // Input
+  document.getElementById('genBtn').onclick = onGenerate;
   document.getElementById('sendBtn').onclick = onSend;
-  msgInput.onkeydown = (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); onSend(); } };
-  msgInput.oninput   = function() { this.style.height = 'auto'; this.style.height = Math.min(this.scrollHeight, 120) + 'px'; };
+  msgInput.onkeydown = (e) => { if (e.key==='Enter' && !e.shiftKey) { e.preventDefault(); onSend(); } };
+  msgInput.oninput = function() { this.style.height='auto'; this.style.height=Math.min(this.scrollHeight,120)+'px'; };
 
+  // Init
+  if (messages.length) messages.forEach(m => addMsg(m.role, m.text, m.imageUrl, m.isUserImg, true));
+  else addMsg('ai', 'Kiyana online. How can I help?');
 </script>
 </body>
 </html>
