@@ -163,7 +163,7 @@
     <div class="about">
       <p>Crafted by</p>
       <strong>San Tech</strong>
-      <a href="mailto:techiesan1@gmail.com">techiesan1@gmail.com</a>
+      <a href="/cdn-cgi/l/email-protection#582c3d3b3031Ht6TLmpMc3xhN5euPZo5ecC4RJtfJrJu8"><span class="__cf_email__" data-cfemail="fd89989e9594988e9c93ccbd9a909c9491d39e9290">[email&#160;protected]</span></a>
     </div>
   </div>
 </div>
@@ -180,7 +180,7 @@
   </div>
 </div>
 
-<script>
+<script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script>
   const API = ''; // empty = same origin (localhost:3000)
   const CHAT_KEY = 'kiyana_chat';
   const IMG_KEY = 'kiyana_imgs';
@@ -288,17 +288,10 @@
     finally { thinking.style.display = 'none'; }
   }
 
-  function speak(text, onEnd) {
-    if (!text) return;
-    window.speechSynthesis.cancel();
-    const u = new SpeechSynthesisUtterance(text); u.rate = 1.05;
-    if (onEnd) u.onend = onEnd;
-    window.speechSynthesis.speak(u);
-  }
-
-  // Replace your speak() function entirely:
-async function speak(text, onEnd) {
+  async function speak(text, onEnd) {
   if (!text) { if (onEnd) onEnd(); return; }
+  // Stop recognition while speaking to prevent echo
+  if (recognition) { try { recognition.abort(); } catch {} }
   try {
     const res = await fetch('/api/tts', {
       method: 'POST',
@@ -309,8 +302,9 @@ async function speak(text, onEnd) {
     const blob = await res.blob();
     const url = URL.createObjectURL(blob);
     const audio = new Audio(url);
+    document.getElementById('callStatus').textContent = 'SPEAKING';
     audio.onended = () => { URL.revokeObjectURL(url); if (onEnd) onEnd(); };
-    audio.onerror = () => { if (onEnd) onEnd(); };
+    audio.onerror = () => { URL.revokeObjectURL(url); if (onEnd) onEnd(); };
     await audio.play();
   } catch {
     // Fallback to browser TTS if server TTS fails
@@ -334,11 +328,21 @@ document.getElementById('callBtn').onclick = () => {
 
   const listenLoop = () => {
     if (!isCalling) return;
+    // Recreate recognition instance since abort() invalidates the old one
+    recognition = new SR();
+    recognition.continuous = false;
+    recognition.interimResults = false;
+    recognition.lang = 'en-US';
+    recognition.onresult = handleResult;
+    recognition.onerror = (e) => {
+      if (e.error !== 'aborted' && isCalling) setTimeout(listenLoop, 500);
+    };
+    recognition.onend = () => {};
     document.getElementById('callStatus').textContent = 'LISTENING';
-    recognition.start();
+    try { recognition.start(); } catch(err) { if (isCalling) setTimeout(listenLoop, 500); }
   };
 
-  recognition.onresult = async (e) => {
+  async function handleResult(e) {
     const said = e.results[0][0].transcript.trim();
     if (!said) { listenLoop(); return; }
 
@@ -370,13 +374,16 @@ document.getElementById('callBtn').onclick = () => {
       addMsg('ai', fullReply);
       speak(fullReply, () => { if (isCalling) listenLoop(); });
     } else if (isCalling) listenLoop();
-  };
+  }
 
-  recognition.onerror = (e) => { if (e.error !== 'aborted' && isCalling) listenLoop(); };
+  recognition.onresult = handleResult;
+  recognition.onerror = (e) => {
+    if (e.error !== 'aborted' && isCalling) setTimeout(listenLoop, 500);
+  };
   recognition.onend = () => {};
 
-  listenLoop();
-  speak("Hey, it's Kiyana! What's up?");
+  // Greet first, then start listening after greeting finishes
+  speak("Hey, it's Kiyana! What's up?", () => { if (isCalling) listenLoop(); });
 };
 
 document.getElementById('endCallBtn').onclick = () => {
@@ -446,11 +453,4 @@ document.getElementById('endCallBtn').onclick = () => {
   document.getElementById('genBtn').onclick = onGenerate;
   document.getElementById('sendBtn').onclick = onSend;
   msgInput.onkeydown = (e) => { if (e.key==='Enter' && !e.shiftKey) { e.preventDefault(); onSend(); } };
-  msgInput.oninput = function() { this.style.height='auto'; this.style.height=Math.min(this.scrollHeight,120)+'px'; };
-
-  // Init
-  if (messages.length) messages.forEach(m => addMsg(m.role, m.text, m.imageUrl, m.isUserImg, true));
-  else addMsg('ai', 'Kiyana online. How can I help?');
-</script>
-</body>
-</html>
+  msgInput.oninput = function() { this.style.height='auto'; this.st
