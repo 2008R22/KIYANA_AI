@@ -1,248 +1,285 @@
-require('dotenv').config();
-const express = require('express');
-const cors = require('cors');
-const fetch = require('node-fetch');
-const path = require('path');
+const API = ''; // empty = same origin (localhost:3000)
+  const CHAT_KEY = 'kiyana_chat';
+  const IMG_KEY = 'kiyana_imgs';
+  const VOICE_SETTINGS_KEY = 'kiyana_voice_enabled';
 
-const app = express();
-const PORT = process.env.PORT || 3000;
-const GROQ_API_KEY = process.env.GROQ_API_KEY;
-const FREEPIK_API_KEY = process.env.FREEPIK_API_KEY;
+  let messages = JSON.parse(localStorage.getItem(CHAT_KEY) || '[]');
+  let imgHistory = JSON.parse(localStorage.getItem(IMG_KEY) || '[]');
+  let isVoiceEnabled = localStorage.getItem(VOICE_SETTINGS_KEY) !== 'false'; 
+  
+  let pendingBase64 = null;
+  let isCalling = false;
+  let recognition = null;
+  
+  // Persistent Audio Object to bypass Android WebView restrictions
+  const kiyanaAudio = new Audio();
 
-app.use(cors());
-app.use(express.json({ limit: '20mb' }));
-app.use(express.static(path.join(__dirname, 'public')));
+  const viewport = document.getElementById('viewport');
+  const msgInput = document.getElementById('msgInput');
+  const thinking = document.getElementById('thinking');
+  const thinkLabel = document.getElementById('thinkLabel');
+  const imgPreview = document.getElementById('imgPreview');
+  const previewThumb = document.getElementById('previewThumb');
 
-// Add this at the top of your script
-let audioUnlocked = false;
+  // --- UTILS & STORAGE ---
+  function save() { localStorage.setItem(CHAT_KEY, JSON.stringify(messages)); }
+  function saveImgs() { localStorage.setItem(IMG_KEY, JSON.stringify(imgHistory)); }
+  
+  function updateVoiceUI() {
+    const onIcon = document.getElementById('voiceOnIcon');
+    const offIcon = document.getElementById('voiceOffIcon');
+    if(onIcon && offIcon) {
+        onIcon.style.display = isVoiceEnabled ? 'block' : 'none';
+        offIcon.style.display = isVoiceEnabled ? 'none' : 'block';
+    }
+  }
 
-function unlockAudio() {
-  if (audioUnlocked) return;
-  const silent = new Audio();
-  silent.play().then(() => {
-    audioUnlocked = true;
-    console.log("Audio Unlocked");
-  }).catch(e => console.error("Audio block", e));
-}
-// 1. Voice State & Audio Object
-let isVoiceEnabled = localStorage.getItem('kiyana_voice_enabled') !== 'false'; 
-const kiyanaAudio = new Audio(); // Persistent audio object
-
-// Update icons on load
-updateVoiceUI();
-
-function updateVoiceUI() {
-    document.getElementById('voiceOnIcon').style.display = isVoiceEnabled ? 'block' : 'none';
-    document.getElementById('voiceOffIcon').style.display = isVoiceEnabled ? 'none' : 'block';
-}
-
-// 2. The "Unlock" Hack for Android APKs
-// This MUST be called directly by a click event to allow future audio to play
-function unlockAudio() {
+  // CRITICAL: Unlocks the audio channel for Android/Median
+  // Must be called directly inside a click handler
+  function unlockAudio() {
     kiyanaAudio.src = "data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAIlYAAESsAAACABAAZGF0YQAAAAA="; 
     kiyanaAudio.play().catch(() => {});
-}
+  }
 
-// 3. Toggle Feature
-document.getElementById('voiceToggle').onclick = () => {
-    unlockAudio(); // Important: Unlocks audio channel when they click the toggle
-    isVoiceEnabled = !isVoiceEnabled;
-    localStorage.setItem('kiyana_voice_enabled', isVoiceEnabled);
-    updateVoiceUI();
-};
+  function escHtml(s) {
+    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
 
-// 4. Modified Speak Function
-async function speak(text, forceSpeak = false, onEnd) {
-    // If voice is off AND it's not a forced call, exit
+  function buildHistory() {
+    return messages.filter(m => !m.isUserImg && !m.imageUrl).slice(-20).map(m => ({
+      role: m.role === 'user' ? 'user' : 'assistant', content: m.text
+    }));
+  }
+
+  // --- CORE CHAT LOGIC ---
+  async function speak(text, forceSpeak = false, onEnd) {
+    if (!text) { if (onEnd) onEnd(); return; }
+    
+    // Check if voice is disabled (and we aren't in a live call)
     if (!isVoiceEnabled && !forceSpeak) {
         if (onEnd) onEnd();
         return;
     }
 
     try {
-        const res = await fetch('/api/tts', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ text })
-        });
-        const blob = await res.blob();
-        const url = URL.createObjectURL(blob);
-        
-        kiyanaAudio.src = url;
-        kiyanaAudio.onended = () => { URL.revokeObjectURL(url); if (onEnd) onEnd(); };
-        await kiyanaAudio.play();
-    } catch (e) {
-        console.error("TTS Failed", e);
-        if (onEnd) onEnd();
-    }
-}
-// Add this to your sendBtn and callBtn
-document.getElementById('sendBtn').addEventListener('click', unlockAudio);
-document.getElementById('callBtn').addEventListener('click', unlockAudio);
-
-// Chat + Image Analysis
-app.post('/api/chat', async (req, res) => {
-  const { message, imageBase64, history } = req.body;
-
-  if (!GROQ_API_KEY) {
-    return res.status(500).json({ error: 'GROQ_API_KEY not set in .env' });
-  }
-
-  const model = imageBase64
-    ? 'meta-llama/llama-4-scout-17b-16e-instruct'
-    : 'llama-3.3-70b-versatile';
-
-  const messages = [
-    { role: 'system', content: 'You are Kiyana, a close friend and partner. Talk casually like a real person — use natural language, contractions, slang when it fits. Be warm, witty, and real.' }
-  ];
-
-  if (!imageBase64 && Array.isArray(history)) {
-    for (const h of history) {
-      if (h.role === 'user' || h.role === 'assistant') {
-        messages.push({ role: h.role, content: h.content });
-      }
-    }
-  }
-
-  if (imageBase64) {
-    messages.push({
-      role: 'user',
-      content: [
-        { type: 'text', text: message || 'Describe this image.' },
-        { type: 'image_url', image_url: { url: `data:image/jpeg;base64,${imageBase64}` } }
-      ]
-    });
-  } else {
-    messages.push({ role: 'user', content: message || '' });
-  }
-
-  try {
-    const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${GROQ_API_KEY}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({ model, messages })
-    });
-
-    const data = await response.json();
-    if (!response.ok) {
-      return res.status(502).json({ error: data.error?.message || 'Groq error' });
-    }
-    res.json({ content: data.choices?.[0]?.message?.content || 'No response.' });
-  } catch (err) {
-    res.status(502).json({ error: 'Connection error: ' + err.message });
-  }
-});
-// 1. At the top, add to your requires:
-const { Readable } = require('stream');
-const ELEVENLABS_API_KEY = process.env.ELEVENLABS_API_KEY;
-const ELEVENLABS_VOICE_ID = process.env.ELEVENLABS_VOICE_ID || 'EXAVITQu4vr4xnSDxMaL'; // default: Bella
-
-// 2. Add this streaming chat endpoint (keeps latency minimal):
-app.post('/api/chat-stream', async (req, res) => {
-  const { message, history } = req.body;
-  if (!GROQ_API_KEY) return res.status(500).json({ error: 'GROQ_API_KEY not set' });
-
-  const messages = [
-    { role: 'system', content: 'You are Kiyana, a close friend and partner on a voice call. Talk like a real person — casual, warm, natural. Keep it short, 1-3 sentences. No emojis, no markdown, no lists.' },
-    ...( Array.isArray(history) ? history.filter(h => h.role === 'user' || h.role === 'assistant') : [] ),
-    { role: 'user', content: message }
-  ];
-
-  res.setHeader('Content-Type', 'text/plain; charset=utf-8');
-  res.setHeader('Transfer-Encoding', 'chunked');
-  res.setHeader('Cache-Control', 'no-cache');
-
-  try {
-    const upstream = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-      method: 'POST',
-      headers: { 'Authorization': `Bearer ${GROQ_API_KEY}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ model: 'llama-3.3-70b-versatile', messages, stream: true })
-    });
-
-    for await (const chunk of upstream.body) {
-      const lines = Buffer.from(chunk).toString().split('\n').filter(l => l.startsWith('data:'));
-      for (const line of lines) {
-        const data = line.slice(5).trim();
-        if (data === '[DONE]') { res.end(); return; }
-        try {
-          const delta = JSON.parse(data).choices?.[0]?.delta?.content;
-          if (delta) res.write(delta);
-        } catch {}
-      }
-    }
-    res.end();
-  } catch (err) {
-    res.status(502).end('Stream error: ' + err.message);
-  }
-});
-
-// 3. Add TTS endpoint using ElevenLabs (ultra-low latency):
-app.post('/api/tts', async (req, res) => {
-  const { text } = req.body;
-  if (!ELEVENLABS_API_KEY) return res.status(500).json({ error: 'ELEVENLABS_API_KEY not set' });
-  if (!text) return res.status(400).json({ error: 'No text provided' });
-
-  try {
-    const ttsRes = await fetch(
-      `https://api.elevenlabs.io/v1/text-to-speech/${ELEVENLABS_VOICE_ID}/stream?optimize_streaming_latency=4`,
-      {
+      const res = await fetch('/api/tts', {
         method: 'POST',
-        headers: { 'xi-api-key': ELEVENLABS_API_KEY, 'Content-Type': 'application/json', 'Accept': 'audio/mpeg' },
-        body: JSON.stringify({
-          text,
-          model_id: 'eleven_turbo_v2',      // fastest model
-          voice_settings: { stability: 0.4, similarity_boost: 0.8, style: 0, use_speaker_boost: false }
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text })
+      });
+      if (!res.ok) throw new Error('TTS failed');
+      
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      
+      kiyanaAudio.src = url;
+      kiyanaAudio.onended = () => { URL.revokeObjectURL(url); if (onEnd) onEnd(); };
+      kiyanaAudio.onerror = () => { if (onEnd) onEnd(); };
+      await kiyanaAudio.play();
+    } catch (err) {
+      console.error("Audio error:", err);
+      // Fallback to browser TTS if server/network fails
+      const u = new SpeechSynthesisUtterance(text); 
+      u.rate = 1.05;
+      if (onEnd) u.onend = onEnd;
+      window.speechSynthesis.speak(u);
+    }
+  }
+
+  async function sendChat(text, base64) {
+    thinkLabel.textContent = 'Thinking';
+    thinking.style.display = 'flex';
+    try {
+      const res = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+            message: text, 
+            imageBase64: base64 || undefined, 
+            history: base64 ? undefined : buildHistory() 
         })
-      }
-    );
-
-    if (!ttsRes.ok) return res.status(502).json({ error: 'ElevenLabs error' });
-    res.setHeader('Content-Type', 'audio/mpeg');
-    res.setHeader('Transfer-Encoding', 'chunked');
-    ttsRes.body.pipe(res);
-  } catch (err) {
-    res.status(502).json({ error: err.message });
-  }
-});
-// Image Generation
-app.post('/api/generate-image', async (req, res) => {
-  const { prompt } = req.body;
-
-  if (!FREEPIK_API_KEY) {
-    return res.status(500).json({ error: 'FREEPIK_API_KEY not set in .env' });
-  }
-  if (!prompt) {
-    return res.status(400).json({ error: 'Prompt is required' });
+      });
+      const data = await res.json();
+      if (!res.ok || data.error) return null;
+      return data.content;
+    } catch(e) { return null; }
+    finally { thinking.style.display = 'none'; }
   }
 
-  try {
-    const genRes = await fetch('https://api.freepik.com/v1/ai/text-to-image', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-freepik-api-key': FREEPIK_API_KEY,
-        'Accept': 'application/json'
-      },
-      body: JSON.stringify({ prompt, num_images: 1, image: { size: 'square_1_1' }, output_format: 'jpeg' })
-    });
+  async function onSend() {
+    unlockAudio(); // Unlock audio for Android on click
+    const text = msgInput.value.trim();
+    if (!text && !pendingBase64) return;
+    
+    const b64 = pendingBase64;
+    const imgSrc = b64 ? `data:image/jpeg;base64,${b64}` : null;
+    addMsg('user', text || 'Analyzing image...', imgSrc, !!b64);
+    
+    msgInput.value = ''; 
+    msgInput.style.height = 'auto';
+    pendingBase64 = null; 
+    imgPreview.style.display = 'none';
+    
+    const reply = await sendChat(text, b64);
+    if (reply) { 
+        addMsg('ai', reply); 
+        speak(reply); // This will only play if isVoiceEnabled is true
+    }
+  }
 
-    const data = await genRes.json();
-    if (!genRes.ok) {
-      return res.status(502).json({ error: 'Freepik error', detail: JSON.stringify(data) });
+  // --- CALL FEATURE ---
+  document.getElementById('callBtn').onclick = () => {
+    unlockAudio(); // Critical for APKs
+    isCalling = true;
+    document.getElementById('callOverlay').style.display = 'flex';
+
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SR) { 
+        document.getElementById('callStatus').textContent = 'NOT SUPPORTED'; 
+        return; 
     }
 
-    const item = data.data?.[0];
-    if (item?.base64) return res.json({ url: `data:image/jpeg;base64,${item.base64}` });
-    if (item?.url) return res.json({ url: item.url });
-    res.status(502).json({ error: 'No image returned' });
-  } catch (err) {
-    res.status(502).json({ error: 'Connection error: ' + err.message });
-  }
-});
+    recognition = new SR();
+    recognition.continuous = false;
+    recognition.interimResults = false;
+    recognition.lang = 'en-US';
 
-app.listen(PORT, () => {
-  console.log(`KIYANA running at http://localhost:${PORT}`);
-});
+    const listenLoop = () => {
+      if (!isCalling) return;
+      document.getElementById('callStatus').textContent = 'LISTENING';
+      try { recognition.start(); } catch(e) {}
+    };
+
+    recognition.onresult = async (e) => {
+      const said = e.results[0][0].transcript.trim();
+      if (!said) { listenLoop(); return; }
+
+      document.getElementById('transcript').textContent = `"${said}"`;
+      document.getElementById('callStatus').textContent = 'THINKING';
+      addMsg('user', said);
+
+      let fullReply = '';
+      try {
+        const res = await fetch('/api/chat-stream', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ message: said, history: buildHistory() })
+        });
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        document.getElementById('callStatus').textContent = 'SPEAKING';
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          fullReply += decoder.decode(value, { stream: true });
+          document.getElementById('transcript').textContent = fullReply;
+        }
+      } catch (err) { fullReply = 'Sorry, I had trouble connecting.'; }
+
+      if (fullReply) {
+        addMsg('ai', fullReply);
+        // During a call, we set forceSpeak to TRUE
+        speak(fullReply, true, () => { if (isCalling) listenLoop(); });
+      } else if (isCalling) listenLoop();
+    };
+
+    recognition.onerror = (e) => { if (e.error !== 'aborted' && isCalling) listenLoop(); };
+    listenLoop();
+    speak("Hey, it's Kiyana! What's up?", true);
+  };
+
+  // --- UI HANDLERS ---
+  function addMsg(role, text, imageUrl, isUserImg, fromHistory) {
+    const entry = { role, text, imageUrl, isUserImg };
+    if (!fromHistory) { messages.push(entry); save(); }
+
+    const div = document.createElement('div');
+    div.className = `msg ${role}`;
+    let imgHtml = '';
+    if (imageUrl) {
+      imgHtml = `<div class="img-wrap">
+        <img src="${imageUrl}" alt="${isUserImg ? 'Uploaded' : 'Generated'}">
+        ${!isUserImg ? `<button class="dl-btn" onclick="dlImg('${imageUrl}')">
+          <svg fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        </button>` : ''}
+      </div>`;
+    }
+    div.innerHTML = `<div class="bubble">${escHtml(text)}${imgHtml}</div>`;
+    viewport.appendChild(div);
+    viewport.scrollTop = viewport.scrollHeight;
+  }
+
+  // Voice Toggle Button
+  document.getElementById('voiceToggle').onclick = () => {
+    unlockAudio();
+    isVoiceEnabled = !isVoiceEnabled;
+    localStorage.setItem(VOICE_SETTINGS_KEY, isVoiceEnabled);
+    updateVoiceUI();
+  };
+
+  document.getElementById('endCallBtn').onclick = () => {
+    isCalling = false;
+    document.getElementById('callOverlay').style.display = 'none';
+    if (recognition) { try { recognition.abort(); } catch {} }
+    kiyanaAudio.pause();
+    kiyanaAudio.src = '';
+  };
+
+  // Settings & History
+  document.getElementById('settingsBtn').onclick = () => document.getElementById('settingsOverlay').classList.add('show');
+  document.getElementById('closeSettings').onclick = () => document.getElementById('settingsOverlay').classList.remove('show');
+  document.getElementById('clearChatBtn').onclick = () => {
+    messages = []; save(); viewport.innerHTML = '';
+    document.getElementById('settingsOverlay').classList.remove('show');
+    addMsg('ai', 'Memory cleared.');
+  };
+
+  // Image generation
+  document.getElementById('genBtn').onclick = onGenerate;
+  async function onGenerate() {
+    unlockAudio();
+    const prompt = msgInput.value.trim();
+    if (!prompt) return;
+    addMsg('user', 'Generate image: ' + prompt);
+    msgInput.value = ''; 
+    thinkLabel.textContent = 'Painting'; 
+    thinking.style.display = 'flex';
+    try {
+      const res = await fetch(`${API}/api/generate-image`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt })
+      });
+      const data = await res.json();
+      if (data.url) {
+        addMsg('ai', 'Here is your image.', data.url);
+        imgHistory.unshift({ url: data.url, prompt, ts: Date.now() }); 
+        saveImgs();
+      }
+    } catch(e) { addMsg('ai', 'Connection error.'); }
+    finally { thinking.style.display = 'none'; }
+  }
+
+  // Image Upload Logic
+  document.getElementById('analyzeBtn').onclick = () => {
+    unlockAudio();
+    document.getElementById('fileInput').click();
+  };
+  document.getElementById('fileInput').onchange = (e) => {
+    const file = e.target.files[0]; if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (f) => {
+      pendingBase64 = f.target.result.split(',')[1];
+      previewThumb.src = f.target.result;
+      imgPreview.style.display = 'flex';
+      msgInput.focus();
+    };
+    reader.readAsDataURL(file); e.target.value = '';
+  };
+  document.getElementById('clearImg').onclick = () => { pendingBase64 = null; imgPreview.style.display = 'none'; };
+
+  // Final Init
+  document.getElementById('sendBtn').onclick = onSend;
+  msgInput.onkeydown = (e) => { if (e.key==='Enter' && !e.shiftKey) { e.preventDefault(); onSend(); } };
+  updateVoiceUI();
+  if (messages.length) messages.forEach(m => addMsg(m.role, m.text, m.imageUrl, m.isUserImg, true));
+  else addMsg('ai', 'Kiyana online. How can I help?');
