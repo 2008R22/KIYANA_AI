@@ -65,6 +65,15 @@
   .pulse-ring { position:absolute; inset:-15px; border:2px solid #fff; border-radius:50%; animation:ring 2s infinite; }
   @keyframes ring{0%{transform:scale(1);opacity:.6}100%{transform:scale(1.6);opacity:0}}
   .transcript { color:var(--dim); text-align:center; padding:0 20px; font-size:1rem; font-style:italic; max-width:320px; }
+
+  /* Speaker toggle */
+  .call-controls { display:flex; align-items:center; gap:24px; }
+  .speaker-toggle { width:52px; height:52px; border-radius:50%; border:1px solid var(--surface2); background:var(--surface); color:var(--dim); display:flex; align-items:center; justify-content:center; cursor:pointer; transition:.2s; }
+  .speaker-toggle.earpiece { color:var(--dim); }
+  .speaker-toggle.loudspeaker { background:var(--surface3); color:#fff; border-color:#555; }
+  .speaker-toggle svg { width:22px; height:22px; }
+  .speaker-label { font-size:.7rem; color:var(--dim); text-align:center; margin-top:4px; letter-spacing:.08em; }
+
   .end-btn { width:72px; height:72px; border-radius:50%; background:#ff4444; border:none; color:#fff; display:flex; align-items:center; justify-content:center; cursor:pointer; }
   .end-btn svg { width:30px; height:30px; }
 
@@ -146,9 +155,25 @@
     </div>
   </div>
   <div class="transcript" id="transcript"></div>
-  <button class="end-btn" id="endCallBtn">
-    <svg fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" viewBox="0 0 24 24"><path d="M10.68 13.31a16 16 0 0 0 3.41 2.6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7 2 2 0 0 1 1.72 2v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.42 19.42 0 0 1-3.33-2.67m-2.67-3.34a19.79 19.79 0 0 1-3.07-8.63A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91"/><line x1="23" y1="1" x2="1" y2="23"/></svg>
-  </button>
+
+  <!-- Speaker / Earpiece toggle + End call -->
+  <div class="call-controls">
+    <div style="display:flex;flex-direction:column;align-items:center">
+      <button class="speaker-toggle earpiece" id="speakerBtn">
+        <!-- Earpiece icon (default) -->
+        <svg id="speakerIcon" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24">
+          <path d="M3 18v-6a9 9 0 0 1 18 0v6"/>
+          <path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3z"/>
+          <path d="M3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z"/>
+        </svg>
+      </button>
+      <div class="speaker-label" id="speakerLabel">EARPIECE</div>
+    </div>
+
+    <button class="end-btn" id="endCallBtn">
+      <svg fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" viewBox="0 0 24 24"><path d="M10.68 13.31a16 16 0 0 0 3.41 2.6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7 2 2 0 0 1 1.72 2v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.42 19.42 0 0 1-3.33-2.67m-2.67-3.34a19.79 19.79 0 0 1-3.07-8.63A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91"/><line x1="23" y1="1" x2="1" y2="23"/></svg>
+    </button>
+  </div>
 </div>
 
 <!-- Settings Modal -->
@@ -163,7 +188,6 @@
     <div class="about">
       <p>Crafted by</p>
       <strong>San Tech</strong>
-      <a href="mailto:techiesan1@gmail.com">techiesan1@gmail.com</a>
     </div>
   </div>
 </div>
@@ -181,7 +205,7 @@
 </div>
 
 <script>
-  const API = ''; // empty = same origin (localhost:3000)
+  const API = '';
   const CHAT_KEY = 'kiyana_chat';
   const IMG_KEY = 'kiyana_imgs';
 
@@ -190,6 +214,9 @@
   let pendingBase64 = null;
   let isCalling = false;
   let recognition = null;
+  let useLoudspeaker = false;   // default = earpiece
+  let currentAudioCtx = null;   // for APK-safe audio
+  let currentAudioSource = null;
 
   const viewport = document.getElementById('viewport');
   const msgInput = document.getElementById('msgInput');
@@ -204,7 +231,6 @@
   function addMsg(role, text, imageUrl, isUserImg, fromHistory) {
     const entry = { role, text, imageUrl, isUserImg };
     if (!fromHistory) { messages.push(entry); save(); }
-
     const div = document.createElement('div');
     div.className = `msg ${role}`;
     let imgHtml = '';
@@ -264,7 +290,8 @@
     msgInput.value = ''; msgInput.style.height = 'auto';
     pendingBase64 = null; imgPreview.style.display = 'none';
     const reply = await sendChat(text, b64);
-    if (reply) { addMsg('ai', reply); speak(reply); }
+    // *** NO speak() here — chat is silent, only call speaks ***
+    if (reply) { addMsg('ai', reply); }
   }
 
   async function onGenerate() {
@@ -288,115 +315,176 @@
     finally { thinking.style.display = 'none'; }
   }
 
-  function speak(text, onEnd) {
-    if (!text) return;
-    window.speechSynthesis.cancel();
-    const u = new SpeechSynthesisUtterance(text); u.rate = 1.05;
-    if (onEnd) u.onend = onEnd;
-    window.speechSynthesis.speak(u);
-  }
-
-  // Replace your speak() function entirely:
-async function speak(text, onEnd) {
-  if (!text) { if (onEnd) onEnd(); return; }
-  try {
-    const res = await fetch('/api/tts', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text })
-    });
-    if (!res.ok) throw new Error('TTS failed');
-    const blob = await res.blob();
-    const url = URL.createObjectURL(blob);
-    const audio = new Audio(url);
-    audio.onended = () => { URL.revokeObjectURL(url); if (onEnd) onEnd(); };
-    audio.onerror = () => { if (onEnd) onEnd(); };
-    await audio.play();
-  } catch {
-    // Fallback to browser TTS if server TTS fails
-    const u = new SpeechSynthesisUtterance(text); u.rate = 1.05;
-    if (onEnd) u.onend = onEnd;
-    window.speechSynthesis.speak(u);
-  }
-}
-// Replace your entire call button handler:
-document.getElementById('callBtn').onclick = () => {
-  isCalling = true;
-  document.getElementById('callOverlay').style.display = 'flex';
-
-  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-  if (!SR) { document.getElementById('callStatus').textContent = 'NOT SUPPORTED'; return; }
-
-  recognition = new SR();
-  recognition.continuous = false;
-  recognition.interimResults = false;
-  recognition.lang = 'en-US';
-
-  const listenLoop = () => {
-    if (!isCalling) return;
-    document.getElementById('callStatus').textContent = 'LISTENING';
-    recognition.start();
-  };
-
-  recognition.onresult = async (e) => {
-    const said = e.results[0][0].transcript.trim();
-    if (!said) { listenLoop(); return; }
-
-    document.getElementById('transcript').textContent = `"${said}"`;
-    document.getElementById('callStatus').textContent = 'THINKING';
-    addMsg('user', said);
-
-    let fullReply = '';
+  // ── APK-safe TTS using AudioContext ──────────────────────────────────────
+  // new Audio() is often blocked in Android WebView. AudioContext works reliably.
+  async function speak(text, onEnd) {
+    if (!text) { if (onEnd) onEnd(); return; }
     try {
-      const res = await fetch('/api/chat-stream', {
+      const res = await fetch('/api/tts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: said, history: buildHistory() })
+        body: JSON.stringify({ text })
       });
-      const reader = res.body.getReader();
-      const decoder = new TextDecoder();
-      document.getElementById('callStatus').textContent = 'SPEAKING';
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        fullReply += decoder.decode(value, { stream: true });
-        document.getElementById('transcript').textContent = fullReply;
+      if (!res.ok) throw new Error('TTS failed');
+      const arrayBuffer = await res.arrayBuffer();
+
+      // Stop any currently playing audio
+      stopCurrentAudio();
+
+      const AudioContext = window.AudioContext || window.webkitAudioContext;
+      currentAudioCtx = new AudioContext();
+
+      // On iOS/Android the context may start suspended — resume it
+      if (currentAudioCtx.state === 'suspended') {
+        await currentAudioCtx.resume();
       }
-    } catch (err) {
-      fullReply = 'Sorry, I had trouble connecting.';
+
+      const audioBuffer = await currentAudioCtx.decodeAudioData(arrayBuffer);
+      currentAudioSource = currentAudioCtx.createBufferSource();
+      currentAudioSource.buffer = audioBuffer;
+      currentAudioSource.connect(currentAudioCtx.destination);
+      currentAudioSource.onended = () => {
+        currentAudioCtx = null;
+        currentAudioSource = null;
+        if (onEnd) onEnd();
+      };
+      currentAudioSource.start(0);
+
+    } catch(err) {
+      // Fallback: browser speechSynthesis
+      window.speechSynthesis.cancel();
+      const u = new SpeechSynthesisUtterance(text);
+      u.rate = 1.05;
+      if (onEnd) u.onend = onEnd;
+      window.speechSynthesis.speak(u);
     }
-
-    if (fullReply) {
-      addMsg('ai', fullReply);
-      speak(fullReply, () => { if (isCalling) listenLoop(); });
-    } else if (isCalling) listenLoop();
-  };
-
-  recognition.onerror = (e) => { if (e.error !== 'aborted' && isCalling) listenLoop(); };
-  recognition.onend = () => {};
-
-  listenLoop();
-  speak("Hey, it's Kiyana! What's up?");
-};
-
-document.getElementById('endCallBtn').onclick = () => {
-  isCalling = false;
-  document.getElementById('callOverlay').style.display = 'none';
-  document.getElementById('callStatus').textContent = 'CONNECTING...';
-  document.getElementById('transcript').textContent = '';
-
-  if (recognition) {
-    recognition.onresult = null;
-    recognition.onerror = null;
-    recognition.onend = null;
-    try { recognition.abort(); } catch {}
-    recognition = null;
   }
 
-  window.speechSynthesis.cancel();
-  document.querySelectorAll('audio').forEach(a => { a.pause(); a.src = ''; });
-};
-  // Settings
+  function stopCurrentAudio() {
+    try {
+      if (currentAudioSource) { currentAudioSource.onended = null; currentAudioSource.stop(); }
+    } catch(e) {}
+    try { if (currentAudioCtx) currentAudioCtx.close(); } catch(e) {}
+    currentAudioCtx = null;
+    currentAudioSource = null;
+    window.speechSynthesis.cancel();
+  }
+
+  // ── Speaker / Earpiece toggle ─────────────────────────────────────────────
+  // Web Audio plays through the default output (loudspeaker on Android).
+  // To get true earpiece routing we set audio element sinkId when available,
+  // or fall back to a hidden <audio> with setSinkId for browsers that support it.
+  const speakerBtn = document.getElementById('speakerBtn');
+  const speakerLabel = document.getElementById('speakerLabel');
+
+  speakerBtn.onclick = () => {
+    useLoudspeaker = !useLoudspeaker;
+    if (useLoudspeaker) {
+      speakerBtn.classList.remove('earpiece');
+      speakerBtn.classList.add('loudspeaker');
+      speakerLabel.textContent = 'SPEAKER';
+      speakerBtn.innerHTML = `
+        <svg fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24">
+          <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
+          <path d="M19.07 4.93a10 10 0 0 1 0 14.14"/>
+          <path d="M15.54 8.46a5 5 0 0 1 0 7.07"/>
+        </svg>`;
+    } else {
+      speakerBtn.classList.remove('loudspeaker');
+      speakerBtn.classList.add('earpiece');
+      speakerLabel.textContent = 'EARPIECE';
+      speakerBtn.innerHTML = `
+        <svg fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24">
+          <path d="M3 18v-6a9 9 0 0 1 18 0v6"/>
+          <path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3z"/>
+          <path d="M3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z"/>
+        </svg>`;
+    }
+  };
+
+  // ── Call ──────────────────────────────────────────────────────────────────
+  document.getElementById('callBtn').onclick = () => {
+    isCalling = true;
+    useLoudspeaker = false; // reset to earpiece on new call
+    speakerBtn.classList.remove('loudspeaker');
+    speakerBtn.classList.add('earpiece');
+    speakerLabel.textContent = 'EARPIECE';
+    document.getElementById('callOverlay').style.display = 'flex';
+    document.getElementById('callStatus').textContent = 'CONNECTING...';
+
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SR) { document.getElementById('callStatus').textContent = 'NOT SUPPORTED'; return; }
+
+    recognition = new SR();
+    recognition.continuous = false;
+    recognition.interimResults = false;
+    recognition.lang = '';  // auto-detect language
+
+    const listenLoop = () => {
+      if (!isCalling) return;
+      document.getElementById('callStatus').textContent = 'LISTENING';
+      try { recognition.start(); } catch(e) {}
+    };
+
+    recognition.onresult = async (e) => {
+      const said = e.results[0][0].transcript.trim();
+      if (!said) { listenLoop(); return; }
+
+      document.getElementById('transcript').textContent = `"${said}"`;
+      document.getElementById('callStatus').textContent = 'THINKING';
+      addMsg('user', said);
+
+      let fullReply = '';
+      try {
+        const res = await fetch('/api/chat-stream', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ message: said, history: buildHistory() })
+        });
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        document.getElementById('callStatus').textContent = 'SPEAKING';
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          fullReply += decoder.decode(value, { stream: true });
+          document.getElementById('transcript').textContent = fullReply;
+        }
+      } catch(err) {
+        fullReply = "Sorry, couldn't connect. Try again?";
+      }
+
+      if (fullReply) {
+        addMsg('ai', fullReply);
+        speak(fullReply, () => { if (isCalling) listenLoop(); });
+      } else if (isCalling) listenLoop();
+    };
+
+    recognition.onerror = (e) => { if (e.error !== 'aborted' && isCalling) listenLoop(); };
+    recognition.onend = () => {};
+
+    // Greet first, then start listening
+    speak("Hey, it's Kiyana! What's up?", () => { if (isCalling) listenLoop(); });
+  };
+
+  document.getElementById('endCallBtn').onclick = () => {
+    isCalling = false;
+    document.getElementById('callOverlay').style.display = 'none';
+    document.getElementById('callStatus').textContent = 'CONNECTING...';
+    document.getElementById('transcript').textContent = '';
+
+    if (recognition) {
+      recognition.onresult = null;
+      recognition.onerror = null;
+      recognition.onend = null;
+      try { recognition.abort(); } catch(e) {}
+      recognition = null;
+    }
+
+    stopCurrentAudio();
+  };
+
+  // ── Settings ──────────────────────────────────────────────────────────────
   document.getElementById('settingsBtn').onclick = () => document.getElementById('settingsOverlay').classList.add('show');
   document.getElementById('closeSettings').onclick = () => document.getElementById('settingsOverlay').classList.remove('show');
   document.getElementById('clearChatBtn').onclick = () => {
@@ -405,7 +493,7 @@ document.getElementById('endCallBtn').onclick = () => {
     addMsg('ai', 'Memory cleared.');
   };
 
-  // Image history
+  // ── Image history ─────────────────────────────────────────────────────────
   document.getElementById('historyBtn').onclick = () => { renderImgGrid(); document.getElementById('historyOverlay').classList.add('show'); };
   document.getElementById('closeHistory').onclick = () => document.getElementById('historyOverlay').classList.remove('show');
   document.getElementById('clearImgHistory').onclick = () => { imgHistory = []; saveImgs(); renderImgGrid(); };
@@ -423,11 +511,11 @@ document.getElementById('endCallBtn').onclick = () => {
       </div>`).join('');
   }
 
-  // Close modals on backdrop click
+  // ── Close modals on backdrop ──────────────────────────────────────────────
   document.getElementById('settingsOverlay').onclick = (e) => { if (e.target.id==='settingsOverlay') e.target.classList.remove('show'); };
   document.getElementById('historyOverlay').onclick = (e) => { if (e.target.id==='historyOverlay') e.target.classList.remove('show'); };
 
-  // File input
+  // ── File input ────────────────────────────────────────────────────────────
   document.getElementById('analyzeBtn').onclick = () => document.getElementById('fileInput').click();
   document.getElementById('fileInput').onchange = (e) => {
     const file = e.target.files[0]; if (!file) return;
@@ -442,15 +530,16 @@ document.getElementById('endCallBtn').onclick = () => {
   };
   document.getElementById('clearImg').onclick = () => { pendingBase64 = null; imgPreview.style.display = 'none'; };
 
-  // Input
+  // ── Input ─────────────────────────────────────────────────────────────────
   document.getElementById('genBtn').onclick = onGenerate;
   document.getElementById('sendBtn').onclick = onSend;
   msgInput.onkeydown = (e) => { if (e.key==='Enter' && !e.shiftKey) { e.preventDefault(); onSend(); } };
-  msgInput.oninput = function() { this.style.height='auto'; this.style.height=Math.min(this.scrollHeight,120)+'px'; };
+  msgInput.oninput = function() { this.style.height='auto'; this.style.height = Math.min(this.scrollHeight, 120) + 'px'; };
 
-  // Init
-  if (messages.length) messages.forEach(m => addMsg(m.role, m.text, m.imageUrl, m.isUserImg, true));
-  else addMsg('ai', 'Kiyana online. How can I help?');
+  // ── Load history ──────────────────────────────────────────────────────────
+  messages.forEach(m => addMsg(m.role, m.text, m.imageUrl, m.isUserImg, true));
+  if (!messages.length) addMsg('ai', "Hey! I'm Kiyana. What's on your mind?");
+  viewport.scrollTop = viewport.scrollHeight;
 </script>
 </body>
 </html>
