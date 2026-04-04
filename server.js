@@ -3,33 +3,30 @@ const express = require('express');
 const cors = require('cors');
 const fetch = require('node-fetch');
 const path = require('path');
-const { Readable } = require('stream');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
-
-// API Keys
 const GROQ_API_KEY = process.env.GROQ_API_KEY;
 const FREEPIK_API_KEY = process.env.FREEPIK_API_KEY;
-const ELEVENLABS_API_KEY = process.env.ELEVENLABS_API_KEY;
-const ELEVENLABS_VOICE_ID = process.env.ELEVENLABS_VOICE_ID || 'EXAVITQu4vr4xnSDxMaL';
 
 app.use(cors());
 app.use(express.json({ limit: '20mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
 
-// ── 1. Chat + Image Analysis ──────────────────────────────────────────────
+// Chat + Image Analysis
 app.post('/api/chat', async (req, res) => {
   const { message, imageBase64, history } = req.body;
 
-  if (!GROQ_API_KEY) return res.status(500).json({ error: 'GROQ_API_KEY not set in .env' });
+  if (!GROQ_API_KEY) {
+    return res.status(500).json({ error: 'GROQ_API_KEY not set in .env' });
+  }
 
   const model = imageBase64
     ? 'meta-llama/llama-4-scout-17b-16e-instruct'
     : 'llama-3.3-70b-versatile';
 
   const messages = [
-    { role: 'system', content: "You are Kiyana, a close friend and partner. Talk casually like a real person — use natural language, contractions, slang when it fits. Be warm, witty, and real. No emojis." }
+    { role: 'system', content: 'You are Kiyana, a close friend and partner. Talk casually like a real person — use natural language, contractions, slang when it fits. Be warm, witty, and real.' }
   ];
 
   if (!imageBase64 && Array.isArray(history)) {
@@ -63,20 +60,26 @@ app.post('/api/chat', async (req, res) => {
     });
 
     const data = await response.json();
-    if (!response.ok) return res.status(502).json({ error: data.error?.message || 'Groq error' });
+    if (!response.ok) {
+      return res.status(502).json({ error: data.error?.message || 'Groq error' });
+    }
     res.json({ content: data.choices?.[0]?.message?.content || 'No response.' });
   } catch (err) {
     res.status(502).json({ error: 'Connection error: ' + err.message });
   }
 });
+// 1. At the top, add to your requires:
+const { Readable } = require('stream');
+const ELEVENLABS_API_KEY = process.env.ELEVENLABS_API_KEY;
+const ELEVENLABS_VOICE_ID = process.env.ELEVENLABS_VOICE_ID || 'EXAVITQu4vr4xnSDxMaL'; // default: Bella
 
-// ── 2. Streaming Chat (for voice call — low latency) ──────────────────────
+// 2. Add this streaming chat endpoint (keeps latency minimal):
 app.post('/api/chat-stream', async (req, res) => {
   const { message, history } = req.body;
   if (!GROQ_API_KEY) return res.status(500).json({ error: 'GROQ_API_KEY not set' });
 
   const messages = [
-    { role: 'system', content: "You are Kiyana, a close friend and partner on a voice call. Talk like a real person — casual, warm, natural. Keep it short, 1-3 sentences max. No emojis, no markdown, no lists." },
+    { role: 'system', content: 'You are Kiyana, a close friend and partner on a voice call. Talk like a real person — casual, warm, natural. Keep it short, 1-3 sentences. No emojis, no markdown, no lists.' },
     ...( Array.isArray(history) ? history.filter(h => h.role === 'user' || h.role === 'assistant') : [] ),
     { role: 'user', content: message }
   ];
@@ -88,10 +91,7 @@ app.post('/api/chat-stream', async (req, res) => {
   try {
     const upstream = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${GROQ_API_KEY}`,
-        'Content-Type': 'application/json'
-      },
+      headers: { 'Authorization': `Bearer ${GROQ_API_KEY}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({ model: 'llama-3.3-70b-versatile', messages, stream: true })
     });
 
@@ -112,7 +112,7 @@ app.post('/api/chat-stream', async (req, res) => {
   }
 });
 
-// ── 3. TTS via ElevenLabs (ultra-low latency) ─────────────────────────────
+// 3. Add TTS endpoint using ElevenLabs (ultra-low latency):
 app.post('/api/tts', async (req, res) => {
   const { text } = req.body;
   if (!ELEVENLABS_API_KEY) return res.status(500).json({ error: 'ELEVENLABS_API_KEY not set' });
@@ -123,33 +123,37 @@ app.post('/api/tts', async (req, res) => {
       `https://api.elevenlabs.io/v1/text-to-speech/${ELEVENLABS_VOICE_ID}/stream?optimize_streaming_latency=4`,
       {
         method: 'POST',
-        headers: {
-          'xi-api-key': ELEVENLABS_API_KEY,
-          'Content-Type': 'application/json',
-          'Accept': 'audio/mpeg'
-        },
+        headers: { 'xi-api-key': ELEVENLABS_API_KEY, 'Content-Type': 'application/json', 'Accept': 'audio/mpeg' },
         body: JSON.stringify({
           text,
-          model_id: 'eleven_turbo_v2',
+          model_id: 'eleven_turbo_v2',      // fastest model
           voice_settings: { stability: 0.4, similarity_boost: 0.8, style: 0, use_speaker_boost: false }
         })
       }
     );
 
     if (!ttsRes.ok) return res.status(502).json({ error: 'ElevenLabs error' });
-    res.setHeader('Content-Type', 'audio/mpeg');
-    res.setHeader('Transfer-Encoding', 'chunked');
-    ttsRes.body.pipe(res);
+
+    // Buffer full audio — WebView can't handle chunked binary streams reliably
+    const chunks = [];
+    for await (const chunk of ttsRes.body) chunks.push(chunk);
+    const audioBuffer = Buffer.concat(chunks);
+    const base64Audio = audioBuffer.toString('base64');
+    res.json({ audio: base64Audio, type: 'audio/mpeg' });
   } catch (err) {
     res.status(502).json({ error: err.message });
   }
 });
-
-// ── 4. Image Generation via Freepik ──────────────────────────────────────
+// Image Generation
 app.post('/api/generate-image', async (req, res) => {
   const { prompt } = req.body;
-  if (!FREEPIK_API_KEY) return res.status(500).json({ error: 'FREEPIK_API_KEY not set in .env' });
-  if (!prompt) return res.status(400).json({ error: 'Prompt is required' });
+
+  if (!FREEPIK_API_KEY) {
+    return res.status(500).json({ error: 'FREEPIK_API_KEY not set in .env' });
+  }
+  if (!prompt) {
+    return res.status(400).json({ error: 'Prompt is required' });
+  }
 
   try {
     const genRes = await fetch('https://api.freepik.com/v1/ai/text-to-image', {
@@ -163,7 +167,9 @@ app.post('/api/generate-image', async (req, res) => {
     });
 
     const data = await genRes.json();
-    if (!genRes.ok) return res.status(502).json({ error: 'Freepik error', detail: JSON.stringify(data) });
+    if (!genRes.ok) {
+      return res.status(502).json({ error: 'Freepik error', detail: JSON.stringify(data) });
+    }
 
     const item = data.data?.[0];
     if (item?.base64) return res.json({ url: `data:image/jpeg;base64,${item.base64}` });
