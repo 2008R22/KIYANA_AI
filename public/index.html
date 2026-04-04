@@ -438,4 +438,13 @@ document.getElementById('endCallBtn').onclick = () => {
   document.getElementById('genBtn').onclick = onGenerate;
   document.getElementById('sendBtn').onclick = onSend;
   msgInput.onkeydown = (e) => { if (e.key==='Enter' && !e.shiftKey) { e.preventDefault(); onSend(); } };
-  msgInput.oninput = function() { this.style.height='auto'; this.st
+  msgInput.oninput = function() { this.style.height='auto'; this.style.height=Math.min(this.scrollHeight,120)+'px'; };
+
+  // Load history on start
+  messages.forEach(m => addMsg(m.role, m.text, m.imageUrl, m.isUserImg, true));
+  if (!messages.length) addMsg('ai', "Hey! I'm Kiyana. What's on your mind?");
+  viewport.scrollTop = viewport.scrollHeight;
+
+</script>
+</body>
+</html>
