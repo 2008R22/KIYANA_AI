@@ -6,6 +6,14 @@
 <title>KIYANA – AI Suite</title>
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
 <script src="https://cdn.median.co/median.js"></script>
+ <script>
+  // Unlock WebView audio on first touch — required for Median free plan
+  document.addEventListener('touchstart', function unlock() {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    ctx.resume().then(() => ctx.close());
+    document.removeEventListener('touchstart', unlock);
+  }, { once: true });
+</script>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   :root { --bg:#000; --surface:#0a0a0a; --surface2:#161616; --surface3:#222; --text:#f0f0f0; --dim:#666; --radius:20px; }
