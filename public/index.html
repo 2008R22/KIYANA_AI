@@ -297,20 +297,16 @@ async function speak(text, onEnd) {
       body: JSON.stringify({ text })
     });
     if (!res.ok) throw new Error('TTS failed');
-    const blob = await res.blob();
-    // FileReader converts blob → base64 data URL (Android WebView can't use blob: URLs)
-    const dataUrl = await new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(reader.result);
-      reader.onerror = reject;
-      reader.readAsDataURL(blob);
-    });
+    const data = await res.json();
+    if (!data.audio) throw new Error('No audio data');
+    // Server returns base64 — works perfectly in Android WebView
+    const dataUrl = `data:${data.type};base64,${data.audio}`;
     const audio = new Audio(dataUrl);
     audio.onended = () => { if (onEnd) onEnd(); };
     audio.onerror = () => { if (onEnd) onEnd(); };
     await audio.play();
   } catch {
-    // Fallback to browser TTS if server TTS fails
+    // Fallback to browser TTS
     const u = new SpeechSynthesisUtterance(text); u.rate = 1.05;
     if (onEnd) u.onend = onEnd;
     window.speechSynthesis.speak(u);
