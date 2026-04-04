@@ -380,9 +380,10 @@
   }
 
   // ── Speaker / Earpiece toggle ─────────────────────────────────────────────
-  // Web Audio plays through the default output (loudspeaker on Android).
-  // To get true earpiece routing we set audio element sinkId when available,
-  // or fall back to a hidden <audio> with setSinkId for browsers that support it.
+speakerBtn.onclick = () => {
+    useLoudspeaker = !useLoudspeaker;
+    if (useLoudspeaker) { document.querySelector('video, audio')?.setSinkId?.('speaker'); }
+    if (useLoudspeaker) }
   const speakerBtn = document.getElementById('speakerBtn');
   const speakerLabel = document.getElementById('speakerLabel');
 
