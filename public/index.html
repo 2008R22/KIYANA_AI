@@ -163,7 +163,7 @@
     <div class="about">
       <p>Crafted by</p>
       <strong>San Tech</strong>
-      <a href="mailto:techiesan1@gmail.com">techiesan1@gmail.com</a>
+      <a href="/cdn-cgi/l/email-protection#5024353338393523313e6110373d31393c7e333f3d"><span class="__cf_email__" data-cfemail="8efaebede6e7ebfdefe0bfcee9e3efe7e2a0ede1e3">[email&#160;protected]</span></a>
     </div>
   </div>
 </div>
@@ -180,7 +180,7 @@
   </div>
 </div>
 
-<script>
+<script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script>
   const API = ''; // empty = same origin (localhost:3000)
   const CHAT_KEY = 'kiyana_chat';
   const IMG_KEY = 'kiyana_imgs';
@@ -264,7 +264,7 @@
     msgInput.value = ''; msgInput.style.height = 'auto';
     pendingBase64 = null; imgPreview.style.display = 'none';
     const reply = await sendChat(text, b64);
-    if (reply) { addMsg('ai', reply); speak(reply); }
+    if (reply) { addMsg('ai', reply); }
   }
 
   async function onGenerate() {
@@ -288,15 +288,6 @@
     finally { thinking.style.display = 'none'; }
   }
 
-  function speak(text, onEnd) {
-    if (!text) return;
-    window.speechSynthesis.cancel();
-    const u = new SpeechSynthesisUtterance(text); u.rate = 1.05;
-    if (onEnd) u.onend = onEnd;
-    window.speechSynthesis.speak(u);
-  }
-
-  // Replace your speak() function entirely:
 async function speak(text, onEnd) {
   if (!text) { if (onEnd) onEnd(); return; }
   try {
@@ -307,9 +298,15 @@ async function speak(text, onEnd) {
     });
     if (!res.ok) throw new Error('TTS failed');
     const blob = await res.blob();
-    const url = URL.createObjectURL(blob);
-    const audio = new Audio(url);
-    audio.onended = () => { URL.revokeObjectURL(url); if (onEnd) onEnd(); };
+    // FileReader converts blob → base64 data URL (Android WebView can't use blob: URLs)
+    const dataUrl = await new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = reject;
+      reader.readAsDataURL(blob);
+    });
+    const audio = new Audio(dataUrl);
+    audio.onended = () => { if (onEnd) onEnd(); };
     audio.onerror = () => { if (onEnd) onEnd(); };
     await audio.play();
   } catch {
@@ -319,7 +316,6 @@ async function speak(text, onEnd) {
     window.speechSynthesis.speak(u);
   }
 }
-// Replace your entire call button handler:
 document.getElementById('callBtn').onclick = () => {
   isCalling = true;
   document.getElementById('callOverlay').style.display = 'flex';
@@ -446,11 +442,4 @@ document.getElementById('endCallBtn').onclick = () => {
   document.getElementById('genBtn').onclick = onGenerate;
   document.getElementById('sendBtn').onclick = onSend;
   msgInput.onkeydown = (e) => { if (e.key==='Enter' && !e.shiftKey) { e.preventDefault(); onSend(); } };
-  msgInput.oninput = function() { this.style.height='auto'; this.style.height=Math.min(this.scrollHeight,120)+'px'; };
-
-  // Init
-  if (messages.length) messages.forEach(m => addMsg(m.role, m.text, m.imageUrl, m.isUserImg, true));
-  else addMsg('ai', 'Kiyana online. How can I help?');
-</script>
-</body>
-</html>
+  msgInput.oninput = function() { this.style.height='auto'; this.st
