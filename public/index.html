@@ -204,12 +204,16 @@
   <div class="pin-error" id="pinError"></div>
 </div>
 
+<!-- Proximity sensor overlay (dims screen when phone near ear) -->
+<div id="proximityOverlay" style="display:none;position:fixed;inset:0;background:#000;z-index:9998;"></div>
+
 <!-- Call Screen -->
 <div id="callScreen">
   <div class="call-top">
     <div class="call-avatar" id="callAvatar">K</div>
     <div class="call-name">Kiyana</div>
     <div class="call-status" id="callStatus">Connecting…</div>
+    <div id="callTimer" style="font-size:.78rem;color:#444;letter-spacing:.06em;margin-top:2px;font-family:'DM Sans',sans-serif;"></div>
     <div class="call-wave" id="callWave">
       <div class="wave-bar" style="height:8px"></div>
       <div class="wave-bar" style="height:16px"></div>
@@ -656,222 +660,304 @@
     }
   }
 
-  // ── Voice Call ─────────────────────────────────────────────────────────────
-  let callActive    = false;
-  let mediaRecorder = null;
-  let audioChunks   = [];
-  let callHistory   = [];
-  let speakerOn     = true;
-  let isListening   = false;
-  let isProcessing  = false;
-  let currentAudio  = null;
+  // ═══════════════════════════════════════════════════════════════
+  //  VOICE CALL ENGINE  — VAD + streaming TTS + proximity sensor
+  // ═══════════════════════════════════════════════════════════════
+  let callActive   = false;
+  let callHistory  = [];
+  let speakerOn    = true;
+  let isProcessing = false;
+  let currentAudio = null;
+
+  // VAD state
+  let micStream      = null;
+  let mediaRecorder  = null;
+  let audioChunks    = [];
+  let vadCtx         = null;
+  let analyser       = null;
+  let vadTimer       = null;
+  let silenceTimer   = null;
+  let hasSpeech      = false;
+  let isListening    = false;
+
+  const SILENCE_MS   = 1200;  // stop after 1.2s of silence
+  const MIN_SPEECH_MS = 400;  // ignore clips shorter than this
+  const SILENCE_THRESHOLD = 10; // RMS below this = silence
 
   const callScreen     = document.getElementById('callScreen');
   const callStatus     = document.getElementById('callStatus');
   const callTranscript = document.getElementById('callTranscript');
   const callWave       = document.getElementById('callWave');
   const callAvatar     = document.getElementById('callAvatar');
-  const micBtn         = null; // mic button removed — fully automatic
   const speakerBtn     = document.getElementById('speakerBtn');
   const endCallBtn     = document.getElementById('endCallBtn');
 
+  function setCallStatus(s) { callStatus.textContent = s; }
+
+  // ── AudioContext (must be created inside user gesture) ─────────────────────
+  let audioCtx = null;
+  function getAudioCtx() {
+    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+    return audioCtx;
+  }
+
+  // ── Proximity sensor → dim screen like a real call ─────────────────────────
+  function enableProximitySensor() {
+    if (!('ProximitySensor' in window)) return;
+    try {
+      const sensor = new ProximitySensor();
+      sensor.addEventListener('reading', () => {
+        if (!callActive) return;
+        // near = hand over screen → black overlay
+        document.getElementById('proximityOverlay').style.display = sensor.near ? 'block' : 'none';
+      });
+      sensor.start();
+    } catch(e) {}
+  }
+
+  // ── Open call ──────────────────────────────────────────────────────────────
   document.getElementById('callBtn').onclick = async () => {
-    unlockAudio(); // must happen inside user gesture
+    getAudioCtx(); // MUST be inside gesture to unlock audio
     callScreen.classList.add('show');
     callActive  = true;
     callHistory = [];
     speakerOn   = true;
     speakerBtn.classList.add('on');
+    setCallStatus('Connecting…');
     callTranscript.textContent = '';
-    setCallStatus('Calling…');
+    enableProximitySensor();
 
-    // Speak the opening greeting immediately
+    // Start call timer
+    const timerEl = document.getElementById('callTimer');
+    let callSeconds = 0;
+    timerEl.textContent = '0:00';
+    const callTimerInterval = setInterval(() => {
+      if (!callActive) { clearInterval(callTimerInterval); timerEl.textContent = ''; return; }
+      callSeconds++;
+      const m = Math.floor(callSeconds / 60);
+      const s = String(callSeconds % 60).padStart(2, '0');
+      timerEl.textContent = `${m}:${s}`;
+    }, 1000);
+
+    // Play greeting immediately
     const greeting = "Kiyana this side!! Hey, what's up?";
     callHistory.push({ role: 'assistant', content: greeting });
     callTranscript.textContent = greeting;
     callAvatar.classList.add('speaking');
     callWave.classList.add('active');
+    setCallStatus('Speaking…');
     await speakText(greeting);
+    if (!callActive) return;
     callAvatar.classList.remove('speaking');
     callWave.classList.remove('active');
-
-    // Auto-start listening right after greeting
-    setCallStatus('Listening…');
-    startListening();
+    startVAD();
   };
 
+  // ── End call ───────────────────────────────────────────────────────────────
   endCallBtn.onclick = () => {
-    stopListening();
-    if (currentAudio) {
-      try { currentAudio.stop(); } catch(e) {}
-      currentAudio = null;
-    }
-    callScreen.classList.remove('show');
     callActive = false;
+    stopVAD();
+    stopCurrentAudio();
+    callScreen.classList.remove('show');
     callWave.classList.remove('active');
+    callAvatar.classList.remove('speaking');
+    document.getElementById('proximityOverlay').style.display = 'none';
   };
 
+  // ── Speaker toggle ─────────────────────────────────────────────────────────
   speakerBtn.onclick = () => {
     speakerOn = !speakerOn;
     speakerBtn.classList.toggle('on', speakerOn);
   };
 
-  // mic is fully automatic — no manual button
+  function stopCurrentAudio() {
+    if (currentAudio) {
+      try { currentAudio.stop(); } catch(e) {}
+      currentAudio = null;
+    }
+  }
 
-  function setCallStatus(text) { callStatus.textContent = text; }
+  // ── VAD: start listening with silence detection ────────────────────────────
+  async function startVAD() {
+    if (isListening || isProcessing || !callActive) return;
+    isListening = true;
+    hasSpeech   = false;
+    audioChunks = [];
+    setCallStatus('Listening…');
+    callTranscript.textContent = '';
 
-  async function startListening() {
-    if (isListening || isProcessing) return;
     try {
-      // Request mic permission explicitly
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
-      audioChunks  = [];
+      micStream = await navigator.mediaDevices.getUserMedia({ audio: {
+        echoCancellation: true,
+        noiseSuppression: true,
+        sampleRate: 16000
+      }, video: false });
 
-      // Pick best supported MIME type
-      const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
-        ? 'audio/webm;codecs=opus'
-        : MediaRecorder.isTypeSupported('audio/webm')
-          ? 'audio/webm'
-          : '';
+      // Set up analyser for VAD
+      const ctx      = getAudioCtx();
+      const source   = ctx.createMediaStreamSource(micStream);
+      analyser       = ctx.createAnalyser();
+      analyser.fftSize = 512;
+      source.connect(analyser);
 
-      mediaRecorder = mimeType
-        ? new MediaRecorder(stream, { mimeType })
-        : new MediaRecorder(stream);
-
-      mediaRecorder.ondataavailable = e => { if (e.data.size > 0) audioChunks.push(e.data); };
-      mediaRecorder.onstop = async () => {
-        stream.getTracks().forEach(t => t.stop());
-        await processAudio();
+      // Choose best MIME
+      const mime = ['audio/webm;codecs=opus','audio/webm','audio/ogg;codecs=opus','audio/mp4']
+        .find(m => MediaRecorder.isTypeSupported(m)) || '';
+      mediaRecorder = mime ? new MediaRecorder(micStream, { mimeType: mime }) : new MediaRecorder(micStream);
+      mediaRecorder.ondataavailable = e => { if (e.data && e.data.size > 0) audioChunks.push(e.data); };
+      mediaRecorder.onstop = () => {
+        micStream.getTracks().forEach(t => t.stop());
+        micStream = null;
+        if (hasSpeech && audioChunks.length) processAudio();
+        else { isListening = false; if (callActive && !isProcessing) startVAD(); }
       };
-      mediaRecorder.start();
-      isListening = true;
-      callWave.classList.add('active');
-      setCallStatus('Listening…');
-      callTranscript.textContent = '';
-    } catch (err) {
-      if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
-        callTranscript.textContent = 'Microphone permission denied. Please allow mic access in your browser settings.';
-      } else if (err.name === 'NotFoundError') {
-        callTranscript.textContent = 'No microphone found. Please connect a mic and try again.';
-      } else {
-        callTranscript.textContent = 'Could not access mic: ' + err.message;
-      }
+      mediaRecorder.start(100); // collect chunks every 100ms
+
+      // VAD loop — check RMS every 100ms
+      const buf = new Uint8Array(analyser.frequencyBinCount);
+      let speechStart = null;
+
+      vadTimer = setInterval(() => {
+        if (!isListening) { clearInterval(vadTimer); return; }
+        analyser.getByteFrequencyData(buf);
+        const rms = Math.sqrt(buf.reduce((s,v) => s + v*v, 0) / buf.length);
+
+        if (rms > SILENCE_THRESHOLD) {
+          // Speech detected
+          if (!speechStart) speechStart = Date.now();
+          hasSpeech = true;
+          clearTimeout(silenceTimer);
+          silenceTimer = null;
+          callWave.classList.add('active');
+        } else if (hasSpeech && !silenceTimer) {
+          // Silence after speech — start countdown
+          silenceTimer = setTimeout(() => {
+            if (isListening && hasSpeech) stopVAD();
+          }, SILENCE_MS);
+        }
+      }, 100);
+
+      // Safety max recording: 30 seconds
+      setTimeout(() => { if (isListening) stopVAD(); }, 30000);
+
+    } catch(err) {
+      isListening = false;
+      if (err.name === 'NotAllowedError') callTranscript.textContent = 'Mic permission denied.';
+      else callTranscript.textContent = 'Mic error: ' + err.message;
       setCallStatus('Error');
     }
   }
 
-  function stopListening() {
-    if (!isListening) return;
+  function stopVAD() {
+    clearInterval(vadTimer);
+    clearTimeout(silenceTimer);
+    vadTimer = null; silenceTimer = null;
     isListening = false;
-    callWave.classList.remove('active');
     if (mediaRecorder && mediaRecorder.state !== 'inactive') mediaRecorder.stop();
+    else if (micStream) { micStream.getTracks().forEach(t => t.stop()); micStream = null; }
   }
 
+  // ── Process recorded audio ─────────────────────────────────────────────────
   async function processAudio() {
-    if (!audioChunks.length) return;
+    if (!audioChunks.length || !callActive) { isListening = false; return; }
     isProcessing = true;
-    setCallStatus('Transcribing…');
+    isListening  = false;
+    callWave.classList.remove('active');
+    setCallStatus('Thinking…');
     callTranscript.textContent = '…';
 
     try {
-      // 1. Determine actual MIME type recorded
-      const mimeType  = mediaRecorder.mimeType || 'audio/webm';
-      const audioBlob = new Blob(audioChunks, { type: mimeType });
+      const mime      = mediaRecorder.mimeType || 'audio/webm';
+      const audioBlob = new Blob(audioChunks, { type: mime });
 
-      // 2. Speech → Text (Deepgram)
+      // Fire STT + (pre-warm) in parallel — Deepgram nova-2 is fast
       const sttRes = await fetch(`${API}/api/stt`, {
         method: 'POST',
-        headers: { 'Content-Type': mimeType },
+        headers: { 'Content-Type': mime },
         body: audioBlob
       });
       const sttData    = await sttRes.json();
-      const transcript = sttData.transcript?.trim();
+      const transcript = (sttData.transcript || '').trim();
 
       if (!transcript) {
-        callTranscript.textContent = "Didn't catch that. Try again.";
-        setCallStatus('Listening…');
+        callTranscript.textContent = '';
         isProcessing = false;
-        startListening();
+        if (callActive) startVAD();
         return;
       }
 
       callTranscript.textContent = transcript;
       callHistory.push({ role: 'user', content: transcript });
 
-      // 3. Text → Groq AI response
-      setCallStatus('Thinking…');
-      const chatRes = await fetch(`${API}/api/chat`, {
+      // Get AI reply
+      const chatRes  = await fetch(`${API}/api/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: transcript, history: callHistory.slice(-10) })
+        body: JSON.stringify({ message: transcript, history: callHistory.slice(-12) })
       });
       const chatData = await chatRes.json();
-      const reply    = chatData.content || 'Sorry, something went wrong.';
+      const reply    = (chatData.content || 'Hmm, something went wrong.').trim();
       callHistory.push({ role: 'assistant', content: reply });
       callTranscript.textContent = reply;
 
-      // 4. Reply → ElevenLabs TTS → play
-      setCallStatus('Speaking…');
+      // Speak reply
+      if (!callActive) { isProcessing = false; return; }
       callAvatar.classList.add('speaking');
       callWave.classList.add('active');
+      setCallStatus('Speaking…');
       await speakText(reply);
       callAvatar.classList.remove('speaking');
       callWave.classList.remove('active');
 
-      // Auto-listen again after speaking
-      setCallStatus('Listening…');
-      startListening();
-
-    } catch (err) {
+    } catch(err) {
       callTranscript.textContent = 'Error: ' + err.message;
-      setCallStatus('Ready');
     } finally {
       isProcessing = false;
+      if (callActive) startVAD();
     }
   }
 
-  // Unlock AudioContext on first user gesture (required by browsers)
-  let audioCtx = null;
-  function unlockAudio() {
-    if (audioCtx) return;
-    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    if (audioCtx.state === 'suspended') audioCtx.resume();
-  }
-
+  // ── TTS via ElevenLabs — streamed blob, played via Audio element ───────────
+  // Using HTMLAudioElement (not AudioContext) so the OS routes audio correctly
+  // (speaker vs earpiece) and system volume controls work.
   async function speakText(text) {
     return new Promise(async (resolve) => {
       try {
-        setCallStatus('Speaking…');
-        const ttsRes = await fetch(`${API}/api/tts`, {
+        const res = await fetch(`${API}/api/tts`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ text })
         });
-        if (!ttsRes.ok) {
-          const errText = await ttsRes.text();
-          callTranscript.textContent = 'TTS error: ' + errText.slice(0, 80);
-          resolve(); return;
-        }
-        const blob = await ttsRes.blob();
-        if (!blob || blob.size < 100) {
-          callTranscript.textContent = 'TTS returned empty audio.';
-          resolve(); return;
-        }
+        if (!res.ok) { resolve(); return; }
 
-        // Decode via AudioContext for guaranteed playback (bypasses autoplay block)
-        const arrayBuffer = await blob.arrayBuffer();
-        if (!audioCtx) unlockAudio();
-        if (audioCtx.state === 'suspended') await audioCtx.resume();
+        const blob = await res.blob();
+        if (!blob || blob.size < 200) { resolve(); return; }
 
-        const decoded = await audioCtx.decodeAudioData(arrayBuffer);
-        const source  = audioCtx.createBufferSource();
-        source.buffer = decoded;
-        source.connect(audioCtx.destination);
-        source.onended = () => { currentAudio = null; resolve(); };
-        source.start(0);
-        currentAudio = source; // store so we can stop on end-call
+        const url  = URL.createObjectURL(blob);
+        const audio = new Audio(url);
+        audio.volume = 1.0;
+
+        // Keep AudioContext alive so browser doesn't suspend it
+        const ctx = getAudioCtx();
+        const silenceBuffer = ctx.createBuffer(1, 1, 22050);
+        const silenceSource = ctx.createBufferSource();
+        silenceSource.buffer = silenceBuffer;
+        silenceSource.connect(ctx.destination);
+        silenceSource.start();
+
+        currentAudio = audio;
+        audio.onended = () => { URL.revokeObjectURL(url); currentAudio = null; resolve(); };
+        audio.onerror = () => { URL.revokeObjectURL(url); currentAudio = null; resolve(); };
+
+        const p = audio.play();
+        if (p && typeof p.catch === 'function') {
+          p.catch(err => {
+            // autoplay blocked — try again after tiny delay
+            setTimeout(() => audio.play().catch(() => resolve()), 300);
+          });
+        }
       } catch(e) {
-        callTranscript.textContent = 'Audio error: ' + e.message;
         resolve();
       }
     });
