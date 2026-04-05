@@ -221,14 +221,11 @@
     </div>
   </div>
 
-  <div class="call-transcript" id="callTranscript">Tap the mic and start talking…</div>
+  <div class="call-transcript" id="callTranscript"></div>
 
   <div class="call-controls">
     <button class="call-btn speaker on" id="speakerBtn" title="Toggle Speaker">
       <svg fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>
-    </button>
-    <button class="call-btn mic" id="micBtn" title="Tap to Talk">
-      <svg fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><rect x="9" y="2" width="6" height="11" rx="3"/><path d="M19 10a7 7 0 0 1-14 0"/><line x1="12" y1="19" x2="12" y2="22"/><line x1="8" y1="22" x2="16" y2="22"/></svg>
     </button>
     <button class="call-btn end" id="endCallBtn" title="End Call">
       <svg fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M10.68 13.31a16 16 0 0 0 3.41 2.6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 2 2 0 0 1-.29-.21M2 2l20 20"/></svg>
@@ -674,18 +671,33 @@
   const callTranscript = document.getElementById('callTranscript');
   const callWave       = document.getElementById('callWave');
   const callAvatar     = document.getElementById('callAvatar');
-  const micBtn         = document.getElementById('micBtn');
+  const micBtn         = null; // mic button removed — fully automatic
   const speakerBtn     = document.getElementById('speakerBtn');
   const endCallBtn     = document.getElementById('endCallBtn');
 
-  document.getElementById('callBtn').onclick = () => {
+  document.getElementById('callBtn').onclick = async () => {
     callScreen.classList.add('show');
     callActive  = true;
     callHistory = [];
     speakerOn   = true;
     speakerBtn.classList.add('on');
-    setCallStatus('Ready');
-    callTranscript.textContent = 'Tap the mic and start talking…';
+    callTranscript.textContent = '';
+    setCallStatus('Calling…');
+
+    // Speak the opening greeting immediately
+    const greeting = "Kiyana this side!! Hey, what's up?";
+    callHistory.push({ role: 'assistant', content: greeting });
+    callTranscript.textContent = greeting;
+    callAvatar.classList.add('speaking');
+    callWave.classList.add('active');
+    setCallStatus('Speaking…');
+    await speakText(greeting);
+    callAvatar.classList.remove('speaking');
+    callWave.classList.remove('active');
+
+    // Auto-start listening right after greeting
+    setCallStatus('Listening…');
+    startListening();
   };
 
   endCallBtn.onclick = () => {
@@ -701,11 +713,7 @@
     speakerBtn.classList.toggle('on', speakerOn);
   };
 
-  micBtn.onclick = () => {
-    if (isProcessing) return;
-    if (isListening) stopListening();
-    else startListening();
-  };
+  // mic is fully automatic — no manual button
 
   function setCallStatus(text) { callStatus.textContent = text; }
 
@@ -734,10 +742,9 @@
       };
       mediaRecorder.start();
       isListening = true;
-      micBtn.classList.add('listening');
       callWave.classList.add('active');
       setCallStatus('Listening…');
-      callTranscript.textContent = '🎙 Speak now…';
+      callTranscript.textContent = '';
     } catch (err) {
       if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
         callTranscript.textContent = 'Microphone permission denied. Please allow mic access in your browser settings.';
@@ -753,7 +760,6 @@
   function stopListening() {
     if (!isListening) return;
     isListening = false;
-    micBtn.classList.remove('listening');
     callWave.classList.remove('active');
     if (mediaRecorder && mediaRecorder.state !== 'inactive') mediaRecorder.stop();
   }
@@ -761,7 +767,6 @@
   async function processAudio() {
     if (!audioChunks.length) return;
     isProcessing = true;
-    micBtn.classList.add('processing');
     setCallStatus('Transcribing…');
     callTranscript.textContent = '…';
 
@@ -787,7 +792,7 @@
         return;
       }
 
-      callTranscript.textContent = '🗣 ' + transcript;
+      callTranscript.textContent = transcript;
       callHistory.push({ role: 'user', content: transcript });
 
       // 3. Text → Groq AI response
@@ -800,7 +805,7 @@
       const chatData = await chatRes.json();
       const reply    = chatData.content || 'Sorry, something went wrong.';
       callHistory.push({ role: 'assistant', content: reply });
-      callTranscript.textContent = '💬 ' + reply;
+      callTranscript.textContent = reply;
 
       // 4. Reply → ElevenLabs TTS → play
       setCallStatus('Speaking…');
@@ -809,14 +814,16 @@
       await speakText(reply);
       callAvatar.classList.remove('speaking');
       callWave.classList.remove('active');
-      setCallStatus('Ready');
+
+      // Auto-listen again after speaking
+      setCallStatus('Listening…');
+      startListening();
 
     } catch (err) {
       callTranscript.textContent = 'Error: ' + err.message;
       setCallStatus('Ready');
     } finally {
       isProcessing = false;
-      micBtn.classList.remove('processing');
     }
   }
 
@@ -830,17 +837,16 @@
         });
         if (!ttsRes.ok) { resolve(); return; }
         const blob = await ttsRes.blob();
+        if (!blob.size) { resolve(); return; }
         const url  = URL.createObjectURL(blob);
         currentAudio = new Audio(url);
-
-        // Try speaker output (supported on some Android browsers)
-        if (speakerOn && currentAudio.setSinkId) {
-          try { await currentAudio.setSinkId('default'); } catch(e) {}
-        }
-
         currentAudio.onended = () => { URL.revokeObjectURL(url); currentAudio = null; resolve(); };
-        currentAudio.onerror = () => { resolve(); };
-        await currentAudio.play().catch(() => resolve());
+        currentAudio.onerror = () => { URL.revokeObjectURL(url); currentAudio = null; resolve(); };
+        // play() returns a promise — must catch rejection (autoplay policy)
+        const playPromise = currentAudio.play();
+        if (playPromise !== undefined) {
+          playPromise.catch(() => { resolve(); });
+        }
       } catch(e) { resolve(); }
     });
   }
