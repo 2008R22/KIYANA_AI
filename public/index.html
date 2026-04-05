@@ -676,6 +676,7 @@
   const endCallBtn     = document.getElementById('endCallBtn');
 
   document.getElementById('callBtn').onclick = async () => {
+    unlockAudio(); // must happen inside user gesture
     callScreen.classList.add('show');
     callActive  = true;
     callHistory = [];
@@ -690,7 +691,6 @@
     callTranscript.textContent = greeting;
     callAvatar.classList.add('speaking');
     callWave.classList.add('active');
-    setCallStatus('Speaking…');
     await speakText(greeting);
     callAvatar.classList.remove('speaking');
     callWave.classList.remove('active');
@@ -702,7 +702,10 @@
 
   endCallBtn.onclick = () => {
     stopListening();
-    if (currentAudio) { currentAudio.pause(); currentAudio = null; }
+    if (currentAudio) {
+      try { currentAudio.stop(); } catch(e) {}
+      currentAudio = null;
+    }
     callScreen.classList.remove('show');
     callActive = false;
     callWave.classList.remove('active');
@@ -786,9 +789,9 @@
 
       if (!transcript) {
         callTranscript.textContent = "Didn't catch that. Try again.";
-        setCallStatus('Ready');
+        setCallStatus('Listening…');
         isProcessing = false;
-        micBtn.classList.remove('processing');
+        startListening();
         return;
       }
 
@@ -827,27 +830,50 @@
     }
   }
 
+  // Unlock AudioContext on first user gesture (required by browsers)
+  let audioCtx = null;
+  function unlockAudio() {
+    if (audioCtx) return;
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+  }
+
   async function speakText(text) {
     return new Promise(async (resolve) => {
       try {
+        setCallStatus('Speaking…');
         const ttsRes = await fetch(`${API}/api/tts`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ text })
         });
-        if (!ttsRes.ok) { resolve(); return; }
-        const blob = await ttsRes.blob();
-        if (!blob.size) { resolve(); return; }
-        const url  = URL.createObjectURL(blob);
-        currentAudio = new Audio(url);
-        currentAudio.onended = () => { URL.revokeObjectURL(url); currentAudio = null; resolve(); };
-        currentAudio.onerror = () => { URL.revokeObjectURL(url); currentAudio = null; resolve(); };
-        // play() returns a promise — must catch rejection (autoplay policy)
-        const playPromise = currentAudio.play();
-        if (playPromise !== undefined) {
-          playPromise.catch(() => { resolve(); });
+        if (!ttsRes.ok) {
+          const errText = await ttsRes.text();
+          callTranscript.textContent = 'TTS error: ' + errText.slice(0, 80);
+          resolve(); return;
         }
-      } catch(e) { resolve(); }
+        const blob = await ttsRes.blob();
+        if (!blob || blob.size < 100) {
+          callTranscript.textContent = 'TTS returned empty audio.';
+          resolve(); return;
+        }
+
+        // Decode via AudioContext for guaranteed playback (bypasses autoplay block)
+        const arrayBuffer = await blob.arrayBuffer();
+        if (!audioCtx) unlockAudio();
+        if (audioCtx.state === 'suspended') await audioCtx.resume();
+
+        const decoded = await audioCtx.decodeAudioData(arrayBuffer);
+        const source  = audioCtx.createBufferSource();
+        source.buffer = decoded;
+        source.connect(audioCtx.destination);
+        source.onended = () => { currentAudio = null; resolve(); };
+        source.start(0);
+        currentAudio = source; // store so we can stop on end-call
+      } catch(e) {
+        callTranscript.textContent = 'Audio error: ' + e.message;
+        resolve();
+      }
     });
   }
 
