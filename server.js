@@ -8,15 +8,15 @@ const PORT = process.env.PORT || 3000;
 const GROQ_API_KEY = process.env.GROQ_API_KEY;
 const FREEPIK_API_KEY = process.env.FREEPIK_API_KEY;
 const ELEVENLABS_API_KEY = process.env.ELEVENLABS_API_KEY;
-const ELEVENLABS_VOICE_ID = process.env.ELEVENLABS_VOICE_ID || 'EXAVITQu4vr4xnSDxMaL'; // default: Bella
+const ELEVENLABS_VOICE_ID = process.env.ELEVENLABS_VOICE_ID || 'EXAVITQu4vr4xnSDxMaL';
 
 app.use(cors());
 app.use(express.json({ limit: '20mb' }));
-app.use(express.static(path.join(__dirname)));
+app.use(express.static(path.join(__dirname, 'public')));
 
 // ── Serve index.html at root ───────────────────────────────────────────────────
 app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, 'index.html'));
+  res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
 // ── Chat + Image Analysis ──────────────────────────────────────────────────────
@@ -179,10 +179,10 @@ app.post('/api/generate-image', async (req, res) => {
   }
 });
 
-// ── Export for Vercel (required — do NOT call app.listen in serverless) ────────
+// ── Export for Vercel ──────────────────────────────────────────────────────────
 module.exports = app;
 
-// ── Local dev fallback ─────────────────────────────────────────────────────────
+// ── Local dev only ─────────────────────────────────────────────────────────────
 if (require.main === module) {
   app.listen(PORT, () => {
     console.log(`KIYANA running at http://localhost:${PORT}`);
