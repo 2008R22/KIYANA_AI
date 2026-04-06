@@ -1059,6 +1059,7 @@ async function speakReply(text){
       currentAudio.onended=()=>{ URL.revokeObjectURL(url); currentAudio=null; resolve(); };
       currentAudio.onerror=()=>{ URL.revokeObjectURL(url); resolve(); };
       
+      console.log("AudioContext State:", audioCtx.state);
       await currentAudio.play();
     }catch(e){ resolve(); }
   });
