@@ -800,10 +800,13 @@ async function onGenerate(){
    LIVE CALL — always-on, VAD (silence detection), real phone-call feel
    Flow: mic open → detect speech start → record → detect silence → send → reply → repeat
 ═══════════════════════════════════════════════════════════════════════════ */
+/* ═══════════════════════════════════════════════════════════════════════════
+   LIVE CALL — Always-on, VAD, Real phone-call feel
+═══════════════════════════════════════════════════════════════════════════ */
 let callActive    = false;
 let callHistory   = [];
 let speakerOn     = true;
-let isProcessing  = false;   // true while thinking/speaking
+let isProcessing  = false;   
 let currentAudio  = null;
 let callTimerInt  = null;
 let callSeconds   = 0;
@@ -815,14 +818,14 @@ let analyser        = null;
 let vadInterval     = null;
 let mediaRecorder   = null;
 let audioChunks     = [];
-let isSpeaking      = false;   // user is currently speaking
+let isSpeaking      = false;   
 let silenceTimer    = null;
 let speechStarted   = false;
 
 // VAD thresholds
-const SPEECH_THRESHOLD  = 18;   // RMS level to consider as speech
-const SILENCE_MS        = 1200; // ms of silence after speech to trigger send
-const MIN_SPEECH_MS     = 400;  // ignore blips shorter than this
+const SPEECH_THRESHOLD  = 18;   
+const SILENCE_MS        = 1200; 
+const MIN_SPEECH_MS     = 400;  
 
 const callScreen     = document.getElementById('callScreen');
 const callTranscript = document.getElementById('callTranscript');
@@ -848,6 +851,14 @@ function stopCallTimer(){ clearInterval(callTimerInt); callTimerInt=null; }
 
 // ── Open call ────────────────────────────────────────────────────────────────
 document.getElementById('callBtn').onclick = async () => {
+  // CRITICAL FIX: Unlock AudioContext on User Gesture
+  if (!audioCtx) {
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  }
+  if (audioCtx.state === 'suspended') {
+    await audioCtx.resume();
+  }
+
   callScreen.classList.add('show');
   callActive=true; callHistory=[]; speakerOn=true;
   speakerBtn.classList.add('on');
@@ -858,14 +869,12 @@ document.getElementById('callBtn').onclick = async () => {
 };
 
 // ── End call ─────────────────────────────────────────────────────────────────
-endCallBtn.onclick = () => {
-  endCall();
-};
+endCallBtn.onclick = () => { endCall(); };
 
 function endCall(){
   callActive=false;
   stopMic();
-  if(currentAudio){ currentAudio.pause(); currentAudio=null; }
+  if(currentAudio){ currentAudio.pause(); currentAudio.src = ""; currentAudio=null; }
   isProcessing=false;
   stopCallTimer();
   callScreen.classList.remove('show');
@@ -886,7 +895,9 @@ async function startMic(){
       audio:{ echoCancellation:true, noiseSuppression:true, autoGainControl:true }
     });
 
-    audioCtx  = new (window.AudioContext||window.webkitAudioContext)();
+    // Re-verify AudioContext is active
+    if (audioCtx.state === 'suspended') await audioCtx.resume();
+    
     analyser  = audioCtx.createAnalyser();
     analyser.fftSize = 512;
     const source = audioCtx.createMediaStreamSource(micStream);
@@ -896,13 +907,11 @@ async function startMic(){
     callTranscript.textContent='Go ahead, I\'m listening…';
     callWave.className='call-wave user-speaking';
 
-    // Poll volume every 80ms
     const dataArray = new Uint8Array(analyser.fftSize);
     vadInterval = setInterval(()=>{
       if(!callActive||isProcessing) return;
       analyser.getByteTimeDomainData(dataArray);
 
-      // Compute RMS
       let sum=0;
       for(let i=0;i<dataArray.length;i++){
         const v=(dataArray[i]-128)/128;
@@ -911,7 +920,6 @@ async function startMic(){
       const rms = Math.sqrt(sum/dataArray.length)*100;
 
       if(rms > SPEECH_THRESHOLD){
-        // User is speaking
         clearTimeout(silenceTimer); silenceTimer=null;
         if(!isSpeaking){
           isSpeaking=true;
@@ -919,7 +927,6 @@ async function startMic(){
           startRecording();
         }
       } else {
-        // Silence detected
         if(isSpeaking && !silenceTimer){
           silenceTimer=setTimeout(()=>{
             isSpeaking=false;
@@ -931,7 +938,7 @@ async function startMic(){
     }, 80);
 
   }catch(err){
-    callTranscript.textContent='Mic access denied — please allow microphone permission.';
+    callTranscript.textContent='Mic access denied.';
     setStatus('Error');
   }
 }
@@ -941,8 +948,6 @@ function stopMic(){
   clearTimeout(silenceTimer); silenceTimer=null;
   if(mediaRecorder && mediaRecorder.state!=='inactive') mediaRecorder.stop();
   if(micStream) micStream.getTracks().forEach(t=>t.stop());
-  if(audioCtx) audioCtx.close();
-  micStream=null; audioCtx=null; analyser=null;
   isSpeaking=false; speechStarted=false; audioChunks=[];
 }
 
@@ -950,10 +955,7 @@ function stopMic(){
 function startRecording(){
   if(!micStream) return;
   audioChunks=[];
-  const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
-    ? 'audio/webm;codecs=opus'
-    : MediaRecorder.isTypeSupported('audio/webm')
-    ? 'audio/webm' : 'audio/ogg';
+  const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus') ? 'audio/webm;codecs=opus' : 'audio/webm';
 
   try{
     mediaRecorder = new MediaRecorder(micStream,{mimeType});
@@ -986,13 +988,11 @@ async function processAudio(){
 
     if(audioBlob.size < 800){ resumeListening(); isProcessing=false; return; }
 
-    // 1. Deepgram STT
     const sttRes = await fetch(`${API}/api/stt`,{
       method:'POST',
       headers:{'Content-Type':mimeType},
       body:audioBlob
     });
-    if(!sttRes.ok) throw new Error('STT failed '+sttRes.status);
     const sttData  = await sttRes.json();
     const transcript = (sttData.transcript||'').trim();
 
@@ -1001,70 +1001,68 @@ async function processAudio(){
     callTranscript.textContent='🗣 '+transcript;
     callHistory.push({role:'user',content:transcript});
 
-    // 2. Groq AI
     setStatus('Thinking…');
     const chatRes = await fetch(`${API}/api/chat`,{
       method:'POST', headers:{'Content-Type':'application/json'},
       body:JSON.stringify({message:transcript, history:callHistory.slice(-12)})
     });
-    if(!chatRes.ok) throw new Error('Chat failed');
     const chatData = await chatRes.json();
-    const reply = (chatData.content||'Sorry about that.').replace(/[*_~`#>]/g,'');
+    const reply = (chatData.content||'Sorry.').replace(/[*_~`#>]/g,'');
     callHistory.push({role:'assistant',content:reply});
     callTranscript.textContent='💬 '+reply;
 
-    // 3. TTS → play
     setStatus('Speaking…');
-    avatarRing.className='avatar-ring pulse';
+    avatarRing.classList.add('pulse');
     callWave.className='call-wave ai-speaking';
+    
     await speakReply(reply);
-    avatarRing.className='avatar-ring';
+    
+    avatarRing.classList.remove('pulse');
 
   }catch(err){
-    callTranscript.textContent='⚠️ '+err.message;
+    callTranscript.textContent='⚠️ Error';
   }finally{
     isProcessing=false;
     if(callActive) resumeListening();
   }
 }
 
-// After Kiyana speaks, resume listening immediately
 function resumeListening(){
   if(!callActive) return;
   callWave.className='call-wave user-speaking';
   setStatus('Listening…');
   callTranscript.textContent='Go ahead…';
   isSpeaking=false; speechStarted=false;
-  // mediaRecorder stays ready; VAD loop is still running
 }
 
-// ── Play TTS audio ────────────────────────────────────────────────────────────
+// ── Play TTS audio (REFIXED) ──────────────────────────────────────────────────
 async function speakReply(text){
   return new Promise(async(resolve)=>{
+    if(!speakerOn) return resolve();
     try{
       const ttsRes=await fetch(`${API}/api/tts`,{
         method:'POST', headers:{'Content-Type':'application/json'},
         body:JSON.stringify({text})
       });
-      if(!ttsRes.ok){ console.error('TTS fail',ttsRes.status); resolve(); return; }
+      if(!ttsRes.ok) throw new Error('TTS fail');
+      
       const blob=await ttsRes.blob();
-      if(!blob.size){ resolve(); return; }
-
       const url=URL.createObjectURL(blob);
-      currentAudio=new Audio(url);
-      currentAudio.volume=1.0;
+      
+      if(currentAudio){ currentAudio.pause(); currentAudio.src=""; }
 
-      if(currentAudio.setSinkId){
-        try{ await currentAudio.setSinkId('default'); }catch(e){}
-      }
+      currentAudio=new Audio(url);
+      
+      // Ensure AudioContext is resumed before playing
+      if (audioCtx && audioCtx.state === 'suspended') await audioCtx.resume();
 
       currentAudio.onended=()=>{ URL.revokeObjectURL(url); currentAudio=null; resolve(); };
       currentAudio.onerror=()=>{ URL.revokeObjectURL(url); resolve(); };
-      currentAudio.play().catch(()=>resolve());
+      
+      await currentAudio.play();
     }catch(e){ resolve(); }
   });
 }
-
 /* ═══════════════════════════════════════════════════════════════════════════
    PERSIST ON HIDE
 ═══════════════════════════════════════════════════════════════════════════ */
