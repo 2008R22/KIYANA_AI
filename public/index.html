@@ -261,119 +261,12 @@ header {
 }
 .shake-hint.show { opacity:1; }
 
-/* ═══════════════════════════════════════════════════════
-   CALL SCREEN — fully rewritten
-═══════════════════════════════════════════════════════ */
-#callScreen {
-  position:fixed; inset:0; z-index:1000;
-  background:#000;
-  display:none; flex-direction:column;
-  align-items:center; justify-content:space-between;
-  padding:48px 24px 40px;
-  padding-top:max(48px, calc(env(safe-area-inset-top) + 32px));
-  padding-bottom:max(40px, calc(env(safe-area-inset-bottom) + 24px));
+/* ── Voice mic button recording state ── */
+.action-btn.recording {
+  background:#ff3b30 !important; color:#fff !important;
+  animation:micPulse 1s ease-in-out infinite;
 }
-#callScreen.show { display:flex; }
-
-.call-top { display:flex; flex-direction:column; align-items:center; gap:16px; width:100%; }
-
-.call-avatar-wrap { position:relative; width:110px; height:110px; }
-.avatar-ring {
-  position:absolute; inset:-10px; border-radius:50%;
-  border:2px solid transparent; transition:.4s;
-}
-.avatar-ring.pulse {
-  border-color:rgba(255,255,255,.25);
-  animation:ringPulse 1.4s ease-in-out infinite;
-}
-@keyframes ringPulse {
-  0%,100% { transform:scale(1); opacity:.5; }
-  50%      { transform:scale(1.1); opacity:1; }
-}
-.call-avatar {
-  width:110px; height:110px; border-radius:50%;
-  background:linear-gradient(135deg,#1a1a1a,#2a2a2a);
-  border:2px solid var(--surface3);
-  display:flex; align-items:center; justify-content:center;
-  font-family:'Syne',sans-serif; font-size:2.6rem; font-weight:800; color:#fff;
-}
-
-.call-name { font-family:'Syne',sans-serif; font-size:1.6rem; font-weight:800; letter-spacing:.04em; }
-.call-timer { font-size:.84rem; color:var(--dim); font-variant-numeric:tabular-nums; letter-spacing:.08em; }
-
-/* Status badge */
-.call-status-badge {
-  font-size:.74rem; letter-spacing:.12em; color:var(--dim);
-  text-transform:uppercase; min-height:18px;
-}
-/* Color states for status */
-.call-status-badge.listening { color:#4caf50; }
-.call-status-badge.speaking  { color:#90caf9; }
-.call-status-badge.thinking  { color:#ffb74d; }
-.call-status-badge.error     { color:#ef5350; }
-
-/* Wave visualiser */
-.call-wave { display:flex; align-items:center; gap:3px; height:36px; }
-.wave-bar {
-  width:3px; border-radius:2px; background:#1e1e1e;
-  height:4px; transition:background .3s;
-}
-.call-wave.ai-speaking .wave-bar {
-  background:#fff;
-  animation:waveAnim .5s ease-in-out infinite alternate;
-}
-.call-wave.user-speaking .wave-bar {
-  background:#555;
-  animation:waveAnim .4s ease-in-out infinite alternate;
-}
-.wave-bar:nth-child(1){animation-delay:0s}    .wave-bar:nth-child(2){animation-delay:.07s}
-.wave-bar:nth-child(3){animation-delay:.14s}  .wave-bar:nth-child(4){animation-delay:.21s}
-.wave-bar:nth-child(5){animation-delay:.1s}   .wave-bar:nth-child(6){animation-delay:.04s}
-.wave-bar:nth-child(7){animation-delay:.18s}  .wave-bar:nth-child(8){animation-delay:.08s}
-.wave-bar:nth-child(9){animation-delay:.16s}
-@keyframes waveAnim { from{height:3px} to{height:28px} }
-
-/* Transcript card */
-.call-card {
-  width:100%; max-width:360px;
-  background:rgba(255,255,255,.04);
-  border:1px solid rgba(255,255,255,.07);
-  border-radius:20px; padding:16px 20px;
-  min-height:72px; display:flex; align-items:center; justify-content:center;
-}
-.call-card p {
-  font-size:.9rem; line-height:1.55; color:rgba(255,255,255,.7);
-  text-align:center;
-}
-
-/* Controls row */
-.call-controls { display:flex; gap:18px; align-items:center; }
-
-.call-btn {
-  width:62px; height:62px; border-radius:50%; border:none;
-  display:flex; align-items:center; justify-content:center;
-  cursor:pointer; transition:transform .15s, background .2s; flex-shrink:0;
-}
-.call-btn svg { width:22px; height:22px; }
-.call-btn:active { transform:scale(.88); }
-
-/* Mute */
-.call-btn.mute   { background:var(--surface2); color:var(--dim); }
-.call-btn.mute.active { background:#fff; color:#000; }
-
-/* Speaker */
-.call-btn.speaker   { background:var(--surface2); color:var(--dim); }
-.call-btn.speaker.active { background:#fff; color:#000; }
-
-/* End */
-.call-btn.end { background:#ff3b30; color:#fff; width:72px; height:72px; }
-
-/* Mic permission notice */
-#micNotice {
-  font-size:.78rem; color:var(--dim); text-align:center; padding:0 24px;
-  display:none;
-}
-#micNotice.show { display:block; }
+@keyframes micPulse { 0%,100%{opacity:1} 50%{opacity:.6} }
 </style>
 </head>
 <body>
@@ -404,9 +297,6 @@ header {
       <div class="brand">KIYANA</div>
     </div>
     <div class="header-right">
-      <button class="icon-btn" id="callBtn" title="Voice Call">
-        <svg fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12 19.79 19.79 0 0 1 1.62 3.38 2 2 0 0 1 3.6 1.21h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 8.77a16 16 0 0 0 6.29 6.29l1.62-1.62a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
-      </button>
       <button class="icon-btn" id="settingsBtn" title="Settings">
         <svg fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
       </button>
@@ -434,6 +324,9 @@ header {
       <button class="action-btn" id="genBtn" title="Generate Image">
         <svg fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M12 2l1.5 4.5L18 8l-4.5 1.5L12 14l-1.5-4.5L6 8l4.5-1.5z"/><path d="M19 14l.75 2.25L22 17l-2.25.75L19 20l-.75-2.25L16 17l2.25-.75z"/></svg>
       </button>
+      <button class="action-btn" id="micBtn" title="Voice input">
+        <svg id="micBtnIcon" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+      </button>
       <textarea id="msgInput" rows="1" placeholder="Say something…"></textarea>
       <button class="send-btn" id="sendBtn">
         <svg fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/></svg>
@@ -459,60 +352,17 @@ header {
   <div class="pin-error" id="pinError"></div>
 </div>
 
-<!-- ══ CALL SCREEN ═══════════════════════════════════════════════════════════ -->
-<div id="callScreen">
-  <!-- top section: avatar + name + timer -->
-  <div class="call-top">
-    <div class="call-avatar-wrap">
-      <div class="avatar-ring" id="avatarRing"></div>
-      <div class="call-avatar">K</div>
-    </div>
-    <div class="call-name">Kiyana</div>
-    <div class="call-timer" id="callTimer">00:00</div>
-    <div class="call-status-badge" id="callStatusBadge">Ready</div>
-  </div>
-
-  <!-- wave + transcript -->
-  <div style="display:flex;flex-direction:column;align-items:center;gap:14px;width:100%">
-    <div class="call-wave" id="callWave">
-      <div class="wave-bar"></div><div class="wave-bar"></div>
-      <div class="wave-bar"></div><div class="wave-bar"></div>
-      <div class="wave-bar"></div><div class="wave-bar"></div>
-      <div class="wave-bar"></div><div class="wave-bar"></div>
-      <div class="wave-bar"></div>
-    </div>
-    <div class="call-card">
-      <p id="callTranscript">Tap call to start talking…</p>
-    </div>
-    <p id="micNotice">Microphone access is needed for voice calls.</p>
-  </div>
-
-  <!-- controls: mute | end | speaker -->
-  <div class="call-controls">
-    <button class="call-btn mute" id="muteBtn" title="Mute">
-      <!-- mic-on icon (default) -->
-      <svg id="muteIconOn" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
-      <!-- mic-off icon (shown when muted) -->
-      <svg id="muteIconOff" style="display:none" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><line x1="1" y1="1" x2="23" y2="23"/><path d="M9 9v3a3 3 0 0 0 5.12 2.12M15 9.34V4a3 3 0 0 0-5.94-.6"/><path d="M17 16.95A7 7 0 0 1 5 12v-2m14 0v2a7 7 0 0 1-.11 1.23"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
-    </button>
-
-    <button class="call-btn end" id="endCallBtn" title="End Call">
-      <svg fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M10.68 13.31a16 16 0 0 0 3.41 2.6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 2 2 0 0 1-.29-.21M2 2l20 20"/></svg>
-    </button>
-
-    <button class="call-btn speaker active" id="speakerBtn" title="Speaker">
-      <!-- speaker-on icon -->
-      <svg id="spkIconOn" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>
-      <!-- speaker-off icon -->
-      <svg id="spkIconOff" style="display:none" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/></svg>
-    </button>
-  </div>
-</div>
-
 <!-- ══ SETTINGS ══════════════════════════════════════════════════════════════ -->
 <div class="overlay" id="settingsOverlay">
   <div class="modal">
     <h3>Settings</h3>
+    <div class="setting-row">
+      <div>
+        <div class="setting-label">Speak Replies</div>
+        <div class="setting-sub" id="speakSub">Kiyana reads her replies aloud</div>
+      </div>
+      <button class="toggle" id="speakToggle"></button>
+    </div>
     <div class="setting-row">
       <div>
         <div class="setting-label">Shake to Lock</div>
@@ -865,7 +715,7 @@ async function onSend(){
   requestAnimationFrame(() => { msgInput.style.height='auto'; });
   pendingBase64=null; imgPreview.style.display='none';
   const reply=await sendChat(text,b64);
-  if(reply) addMsg('ai', reply);
+  if(reply){ addMsg('ai', reply); speakText(reply); }
 }
 
 async function onGenerate(){
@@ -884,139 +734,40 @@ async function onGenerate(){
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   ██████████████████████████████████████████████████████████████████████████
-   LIVE CALL — completely rewritten for reliability in browser + Capacitor
-   ██████████████████████████████████████████████████████████████████████████
+   VOICE INPUT + SPEAK REPLIES
 
-   Architecture:
-   ┌─────────────────────────────────────────────────────────────────┐
-   │  AudioContext (single, created on first user gesture)           │
-   │  ├─ analyser node  ← mic MediaStream source                    │
-   │  │    └─ VAD interval (80ms ticks) → RMS check                 │
-   │  │         ├─ speech detected  → startRecording()              │
-   │  │         └─ silence (1.2 s)  → stopRecordingAndSend()        │
-   │  └─ BufferSource node ← decoded TTS ArrayBuffer                 │
-   └─────────────────────────────────────────────────────────────────┘
-
-   Key fixes vs old code:
-   1. speakReply is a plain async fn (no async-inside-Promise anti-pattern)
-      → errors propagate correctly; call can never freeze
-   2. Mute button added — toggles mic tracks without stopping MediaRecorder
-   3. setStatus() applies CSS class for colour-coded feedback
-   4. Empty STT result shows visible hint ("Didn't catch that…") 
-   5. All state reset in endCall() so reopening works cleanly
-   6. AudioContext reused across sessions (one per page load)
-   7. Capacitor-friendly: no blob URL ever created for audio playback
+   Click mic button to start listening. VAD auto-stops on silence.
+   If "Speak Replies" is on, every AI reply is spoken via TTS.
 ═══════════════════════════════════════════════════════════════════════════ */
 
-/* ── Shared audio context (one per page, created on gesture) ── */
+/* ── Shared audio context (one per page) ── */
 let audioCtx = null;
-
 function ensureAudioCtx(){
-  if(!audioCtx){
-    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-  }
+  if(!audioCtx) audioCtx = new (window.AudioContext||window.webkitAudioContext)();
   return audioCtx;
 }
 async function resumeAudioCtx(){
   const ctx = ensureAudioCtx();
-  if(ctx.state === 'suspended') await ctx.resume();
+  if(ctx.state==='suspended') await ctx.resume();
   return ctx;
 }
 
-/* ── Call state ── */
-let callActive     = false;
-let callHistory    = [];
-let speakerOn      = true;   // TTS playback toggle
-let micMuted       = false;  // mic mute toggle
-let isProcessing   = false;  // STT+chat+TTS pipeline running
-let currentSource  = null;   // BufferSource node for TTS
-let callTimerInt   = null;
-let callSeconds    = 0;
+/* ── Speak Replies setting ── */
+const SPEAK_KEY = 'kiyana_speak_replies';
+let speakReplies = localStorage.getItem(SPEAK_KEY) === 'true';
+let currentSource = null;
 
-/* ── VAD / recording state ── */
-let micStream      = null;
-let analyser       = null;
-let vadInterval    = null;
-let mediaRecorder  = null;
-let audioChunks    = [];
-let isSpeaking     = false;
-let silenceTimer   = null;
-let speechStarted  = false;
-let recordingActive= false;
-let speechStartTs  = 0;
-
-const SPEECH_THRESHOLD = 6;    // RMS threshold (0–100 scale)
-const SILENCE_MS       = 1200; // silence window before sending
-const MIN_SPEECH_MS    = 400;  // ignore noise bursts shorter than this
-
-/* ── DOM refs ── */
-const callScreen    = document.getElementById('callScreen');
-const callTranscript= document.getElementById('callTranscript');
-const callWave      = document.getElementById('callWave');
-const callTimerEl   = document.getElementById('callTimer');
-const callStatusEl  = document.getElementById('callStatusBadge');
-const avatarRing    = document.getElementById('avatarRing');
-const speakerBtn    = document.getElementById('speakerBtn');
-const muteBtn       = document.getElementById('muteBtn');
-const endCallBtn    = document.getElementById('endCallBtn');
-const micNotice     = document.getElementById('micNotice');
-
-/* ── Status helper ── */
-function setStatus(txt, cls=''){
-  callStatusEl.textContent = txt;
-  callStatusEl.className   = 'call-status-badge' + (cls ? ' '+cls : '');
+function updateSpeakUI(){
+  document.getElementById('speakToggle').classList.toggle('on', speakReplies);
 }
+updateSpeakUI();
 
-/* ── Timer ── */
-function startCallTimer(){
-  callSeconds=0; callTimerEl.textContent='00:00';
-  callTimerInt=setInterval(()=>{
-    callSeconds++;
-    const m=String(Math.floor(callSeconds/60)).padStart(2,'0');
-    const s=String(callSeconds%60).padStart(2,'0');
-    callTimerEl.textContent=`${m}:${s}`;
-  },1000);
-}
-function stopCallTimer(){ clearInterval(callTimerInt); callTimerInt=null; }
-
-/* ── Open call ── */
-document.getElementById('callBtn').onclick = async () => {
-  // Must resume AudioContext on user gesture (browser autoplay policy)
-  await resumeAudioCtx();
-
-  // Reset UI state
-  callScreen.classList.add('show');
-  callActive=true; callHistory=[];
-  speakerOn=true; micMuted=false;
-  isProcessing=false;
-
-  // Sync button visuals
-  syncSpeakerBtn();
-  syncMuteBtn();
-
-  micNotice.classList.remove('show');
-  setStatus('Connecting…');
-  callTranscript.textContent = 'Starting call…';
-  callWave.className = 'call-wave';
-  startCallTimer();
-
-  await startMic();
+document.getElementById('speakToggle').onclick = () => {
+  speakReplies = !speakReplies;
+  localStorage.setItem(SPEAK_KEY, speakReplies);
+  updateSpeakUI();
+  if(!speakReplies) stopCurrentAudio();
 };
-
-/* ── End call ── */
-endCallBtn.onclick = () => endCall();
-
-function endCall(){
-  callActive = false;
-  stopMic();
-  stopCurrentAudio();
-  isProcessing = false;
-  stopCallTimer();
-  callScreen.classList.remove('show');
-  callWave.className = 'call-wave';
-  avatarRing.className = 'avatar-ring';
-}
 
 function stopCurrentAudio(){
   if(currentSource){
@@ -1026,294 +777,148 @@ function stopCurrentAudio(){
   }
 }
 
-/* ── Speaker toggle ── */
-speakerBtn.onclick = () => {
-  speakerOn = !speakerOn;
-  syncSpeakerBtn();
-  // If we're mid-playback and user turns speaker off, stop current audio
-  if(!speakerOn) stopCurrentAudio();
-};
-function syncSpeakerBtn(){
-  speakerBtn.classList.toggle('active', speakerOn);
-  document.getElementById('spkIconOn').style.display  = speakerOn ? '' : 'none';
-  document.getElementById('spkIconOff').style.display = speakerOn ? 'none' : '';
+async function speakText(text){
+  if(!speakReplies) return;
+  stopCurrentAudio();
+  try{
+    const res = await fetch(`${API}/api/tts`,{
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({text})
+    });
+    if(!res.ok) return;
+    const arrayBuf = await res.arrayBuffer();
+    if(!arrayBuf || arrayBuf.byteLength < 100) return;
+    if(!speakReplies) return;
+    try{
+      const ctx = await resumeAudioCtx();
+      const audioBuffer = await ctx.decodeAudioData(arrayBuf.slice(0));
+      stopCurrentAudio();
+      if(!speakReplies) return;
+      await new Promise(resolve => {
+        const source = ctx.createBufferSource();
+        source.buffer = audioBuffer;
+        source.connect(ctx.destination);
+        currentSource = source;
+        source.onended = () => { source.disconnect(); if(currentSource===source) currentSource=null; resolve(); };
+        source.start(0);
+      });
+    }catch(decodeErr){
+      const blob = new Blob([arrayBuf],{type:'audio/mpeg'});
+      const url  = URL.createObjectURL(blob);
+      await new Promise((resolve)=>{
+        const audio = new Audio(url);
+        audio.onended = ()=>{ URL.revokeObjectURL(url); resolve(); };
+        audio.onerror = ()=>{ URL.revokeObjectURL(url); resolve(); };
+        audio.play().catch(()=>{ URL.revokeObjectURL(url); resolve(); });
+      });
+    }
+  }catch(e){}
 }
 
-/* ── Mute toggle — pauses mic tracks without stopping MediaRecorder ── */
-muteBtn.onclick = () => {
-  micMuted = !micMuted;
-  syncMuteBtn();
-  // Toggle the actual mic audio tracks so VAD goes quiet while muted
-  if(micStream){
-    micStream.getAudioTracks().forEach(t => t.enabled = !micMuted);
-  }
-};
-function syncMuteBtn(){
-  muteBtn.classList.toggle('active', micMuted);
-  document.getElementById('muteIconOn').style.display  = micMuted ? 'none' : '';
-  document.getElementById('muteIconOff').style.display = micMuted ? '' : 'none';
-}
+/* ── Voice input state ── */
+let micRecording  = false;
+let micStream     = null;
+let micRecorder   = null;
+let micChunks     = [];
+let vadIv         = null;
+let vadAnalyser   = null;
+let silTimer      = null;
+let hasSpeech     = false;
+let speechTs      = 0;
 
-/* ── Start mic + VAD ── */
-async function startMic(){
+/* ── Mic button: click to start / click again to stop ── */
+const micBtn = document.getElementById('micBtn');
+micBtn.onclick = async () => {
+  if(micRecording){ stopVoiceInput(true); return; }
+  await resumeAudioCtx();
+  startVoiceInput();
+};
+
+async function startVoiceInput(){
   try{
     micStream = await navigator.mediaDevices.getUserMedia({
       audio:{ echoCancellation:true, noiseSuppression:true, autoGainControl:true }
     });
-    micNotice.classList.remove('show');
-
-    const ctx = await resumeAudioCtx();
-    analyser = ctx.createAnalyser();
-    analyser.fftSize = 512;
-    const source = ctx.createMediaStreamSource(micStream);
-    source.connect(analyser);
-
-    setStatus('Listening…', 'listening');
-    callTranscript.textContent = "I'm listening…";
-    callWave.className = 'call-wave user-speaking';
-
-    const dataArray = new Uint8Array(analyser.fftSize);
-
-    vadInterval = setInterval(()=>{
-      // Don't run VAD while pipeline is processing or muted
-      if(!callActive || isProcessing || micMuted) return;
-
-      analyser.getByteTimeDomainData(dataArray);
-      let sum = 0;
-      for(let i=0;i<dataArray.length;i++){
-        const v=(dataArray[i]-128)/128;
-        sum+=v*v;
-      }
-      const rms = Math.sqrt(sum/dataArray.length)*100;
-
-      if(rms > SPEECH_THRESHOLD){
-        clearTimeout(silenceTimer); silenceTimer=null;
-        if(!isSpeaking){
-          isSpeaking=true;
-          speechStarted=true;
-          speechStartTs=Date.now();
-          startRecording();
-        }
-      } else {
-        if(isSpeaking && !silenceTimer){
-          silenceTimer = setTimeout(()=>{
-            isSpeaking=false; silenceTimer=null;
-            if(speechStarted){
-              if((Date.now()-speechStartTs) >= MIN_SPEECH_MS){
-                stopRecordingAndSend();
-              } else {
-                // Too short — discard noise burst
-                speechStarted=false;
-                if(mediaRecorder && mediaRecorder.state!=='inactive') mediaRecorder.stop();
-                audioChunks=[];
-                recordingActive=false;
-              }
-            }
-          }, SILENCE_MS);
-        }
-      }
-    }, 80);
-
-  } catch(err) {
-    console.error('Mic error:', err);
-    callTranscript.textContent = 'Microphone access denied.';
-    micNotice.classList.add('show');
-    setStatus('Error', 'error');
+  }catch(e){
+    addMsg('ai','Microphone access denied — please allow mic permission and try again.');
+    return;
   }
-}
+  micRecording = true; micChunks = []; hasSpeech = false;
+  micBtn.classList.add('recording');
+  msgInput.placeholder = 'Listening…';
 
-function stopMic(){
-  clearInterval(vadInterval); vadInterval=null;
-  clearTimeout(silenceTimer); silenceTimer=null;
-  if(mediaRecorder && mediaRecorder.state!=='inactive'){
-    try{ mediaRecorder.stop(); }catch(e){}
-  }
-  if(micStream) micStream.getTracks().forEach(t=>t.stop());
-  micStream=null; analyser=null; mediaRecorder=null;
-  isSpeaking=false; speechStarted=false; audioChunks=[];
-  recordingActive=false;
-}
+  const ctx = ensureAudioCtx();
+  vadAnalyser = ctx.createAnalyser();
+  vadAnalyser.fftSize = 512;
+  ctx.createMediaStreamSource(micStream).connect(vadAnalyser);
 
-/* ── Recording ── */
-function startRecording(){
-  if(!micStream || recordingActive) return;
-  recordingActive=true;
-  audioChunks=[];
   const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
     ? 'audio/webm;codecs=opus' : 'audio/webm';
-  try{
-    mediaRecorder = new MediaRecorder(micStream, {mimeType});
-    mediaRecorder.ondataavailable = e => { if(e.data && e.data.size>0) audioChunks.push(e.data); };
-    mediaRecorder.onstop = () => { recordingActive=false; };
-    mediaRecorder.start(100);
-    callWave.className = 'call-wave user-speaking';
-  }catch(e){
-    console.error('MediaRecorder error', e);
-    recordingActive=false;
-  }
+  micRecorder = new MediaRecorder(micStream, {mimeType});
+  micRecorder.ondataavailable = e => { if(e.data && e.data.size>0) micChunks.push(e.data); };
+  micRecorder.start(100);
+
+  const data = new Uint8Array(vadAnalyser.fftSize);
+  vadIv = setInterval(()=>{
+    if(!micRecording) return;
+    vadAnalyser.getByteTimeDomainData(data);
+    let sum=0;
+    for(let i=0;i<data.length;i++){ const v=(data[i]-128)/128; sum+=v*v; }
+    const rms = Math.sqrt(sum/data.length)*100;
+    if(rms > 7){
+      clearTimeout(silTimer); silTimer=null;
+      if(!hasSpeech){ hasSpeech=true; speechTs=Date.now(); }
+    } else if(hasSpeech && !silTimer){
+      silTimer = setTimeout(()=>{
+        if((Date.now()-speechTs) >= 400) stopVoiceInput(true);
+      }, 1300);
+    }
+  }, 80);
 }
 
-function stopRecordingAndSend(){
-  speechStarted=false;
-  if(!mediaRecorder || mediaRecorder.state==='inactive'){
-    recordingActive=false; return;
+function stopVoiceInput(send=false){
+  micRecording = false;
+  micBtn.classList.remove('recording');
+  msgInput.placeholder = 'Say something…';
+  clearInterval(vadIv); vadIv=null;
+  clearTimeout(silTimer); silTimer=null;
+  if(micStream){ micStream.getTracks().forEach(t=>t.stop()); micStream=null; }
+  vadAnalyser=null;
+  if(micRecorder && micRecorder.state!=='inactive'){
+    micRecorder.onstop = () => {
+      if(send && micChunks.length && hasSpeech) sendVoiceChunks(micChunks.slice());
+      micChunks=[];
+    };
+    micRecorder.stop();
+  } else {
+    micChunks=[];
   }
-  mediaRecorder.onstop = () => {
-    recordingActive=false;
-    processAudio();
-  };
-  mediaRecorder.stop();
+  micRecorder=null;
 }
 
-/* ── STT → Chat → TTS pipeline ── */
-async function processAudio(){
-  if(!audioChunks.length || !callActive){ resumeListening(); return; }
-
-  isProcessing=true;
-  callWave.className='call-wave';
-  setStatus('Transcribing…', 'thinking');
-  callTranscript.textContent='…';
-
+async function sendVoiceChunks(chunks){
+  const mimeType = chunks[0]?.type || 'audio/webm';
+  const blob = new Blob(chunks, {type:mimeType});
+  if(blob.size < 800) return;
+  thinkLabel.textContent='Transcribing'; thinking.style.display='flex';
   try{
-    const mimeType  = audioChunks[0]?.type || 'audio/webm';
-    const audioBlob = new Blob(audioChunks, {type:mimeType});
-    audioChunks=[];
-
-    // Discard tiny blobs (< 800 bytes = likely silence)
-    if(audioBlob.size < 800){ resumeListening(); isProcessing=false; return; }
-
-    // ── STT ──
     const sttRes = await fetch(`${API}/api/stt`,{
-      method:'POST',
-      headers:{'Content-Type':mimeType},
-      body:audioBlob
+      method:'POST', headers:{'Content-Type':mimeType}, body:blob
     });
-    if(!sttRes.ok){
-      const errText = await sttRes.text().catch(()=>'Unknown STT error');
-      console.error('STT error:', sttRes.status, errText);
-      callTranscript.textContent = "Couldn't process audio — try again.";
-      setStatus('Error', 'error');
-      await new Promise(r=>setTimeout(r,1500));
-      isProcessing=false;
-      if(callActive) resumeListening();
-      return;
-    }
-    const sttData    = await sttRes.json();
+    thinking.style.display='none';
+    if(!sttRes.ok) return;
+    const sttData = await sttRes.json();
     const transcript = (sttData.transcript||'').trim();
-
-    // FIX: show visible hint when STT returns empty instead of silently resetting
-    if(!transcript){
-      callTranscript.textContent = "Didn't catch that — try again.";
-      setTimeout(() => {
-        if(callActive && !isProcessing) resumeListening();
-      }, 1200);
-      isProcessing=false;
-      return;
-    }
-
-    callTranscript.textContent='🗣 '+transcript;
-    callHistory.push({role:'user', content:transcript});
-
-       // ── Chat ──
-    setStatus('Thinking…', 'thinking');
-    let reply = "I had a little hiccup — say that again?";
-    try{
-      const chatRes = await fetch(`${API}/api/chat`,{
-        method:'POST', headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({message:transcript, history:callHistory.slice(-12)})
-      });
-      if(chatRes.ok){
-        const chatData = await chatRes.json();
-        if(chatData.content){
-          // Strip markdown symbols that sound weird in TTS
-          reply = chatData.content.replace(/[*_~`#>]/g,'').trim();
-        }
-      } else {
-        console.error('Chat API error:', chatRes.status);
-      }
-    }catch(chatErr){
-      console.error('Chat fetch error:', chatErr.message);
-    }
-
-    callHistory.push({role:'assistant', content:reply});
-    callTranscript.textContent='💬 '+reply;
-
-    // ── TTS ──
-    setStatus('Speaking…', 'speaking');
-    avatarRing.classList.add('pulse');
-    callWave.className='call-wave ai-speaking';
-
-    try{
-      await speakReply(reply);
-    }catch(ttsErr){
-      console.error('TTS failed:', ttsErr.message);
-      callTranscript.textContent='💬 ' + reply;
-      await new Promise(r=>setTimeout(r,2500));
-    }
-
-    avatarRing.classList.remove('pulse');
-
-/* ── TTS playback ──
-   Tries AudioContext.decodeAudioData first (best for Capacitor/Android,
-   no blob URL needed). If that fails (common in desktop Chrome/Firefox
-   due to MP3 header quirks), falls back to a plain Audio element.
-   Either way errors are thrown so processAudio's try/catch handles them
-   gracefully and the call always continues.                               */
-async function speakReply(text){
-  if(!speakerOn) return;
-
-  const ttsRes = await fetch(`${API}/api/tts`,{
-    method:'POST', headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({text})
-  });
-
-  if(!ttsRes.ok){
-    const errText = await ttsRes.text();
-    throw new Error(`TTS ${ttsRes.status}: ${errText}`);
-  }
-
-  const arrayBuf = await ttsRes.arrayBuffer();
-  if(!arrayBuf || arrayBuf.byteLength < 100){
-    throw new Error('TTS returned empty audio');
-  }
-
-  if(!speakerOn) return;
-
-  // ── Try AudioContext path (Capacitor-safe, no blob URL) ──
-  try{
-    const ctx = await resumeAudioCtx();
-    // .slice(0) makes a fresh copy — prevents "detached ArrayBuffer" errors
-    const audioBuffer = await ctx.decodeAudioData(arrayBuf.slice(0));
-
-    stopCurrentAudio();
-    if(!speakerOn) return;
-
-    return new Promise(resolve => {
-      const source = ctx.createBufferSource();
-      source.buffer = audioBuffer;
-      source.connect(ctx.destination);
-      currentSource = source;
-      source.onended = () => {
-        source.disconnect();
-        if(currentSource === source) currentSource = null;
-        resolve();
-      };
-      source.start(0);
-    });
-
-  } catch(decodeErr){
-    // ── Fallback: blob URL + Audio element (works in all browsers) ──
-    console.warn('AudioContext decode failed, using Audio element fallback:', decodeErr.message);
-    const blob = new Blob([arrayBuf], {type:'audio/mpeg'});
-    const url  = URL.createObjectURL(blob);
-    return new Promise((resolve, reject) => {
-      const audio = new Audio(url);
-      audio.onended = () => { URL.revokeObjectURL(url); resolve(); };
-      audio.onerror = () => { URL.revokeObjectURL(url); reject(new Error('Audio element playback failed')); };
-      audio.play().catch(e => { URL.revokeObjectURL(url); reject(e); });
-    });
+    if(!transcript) return;
+    msgInput.value = transcript;
+    msgInput.style.height = 'auto';
+    onSend();
+  }catch(e){
+    thinking.style.display='none';
   }
 }
+
+
 
 /* ═══════════════════════════════════════════════════════════════════════════
    PERSIST ON HIDE
