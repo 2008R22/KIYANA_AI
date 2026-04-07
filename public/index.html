@@ -365,22 +365,6 @@ header {
 .call-btn.speaker   { background:var(--surface2); color:var(--dim); }
 .call-btn.speaker.active { background:#fff; color:#000; }
 
-  /* ── TTS ──*/
-setStatus('Speaking…', 'speaking');
-avatarRing.classList.add('pulse');
-callWave.className='call-wave ai-speaking';
-
-try{
-  await speakReply(reply);
-}catch(ttsErr){
-  // TTS failed — show the reply as text and keep going
-  console.error('TTS error:', ttsErr);
-  callTranscript.textContent='💬 (voice unavailable) '+reply;
-  await new Promise(r=>setTimeout(r,2000));
-}
-
-avatarRing.classList.remove('pulse');
-
 /* End */
 .call-btn.end { background:#ff3b30; color:#fff; width:72px; height:72px; }
 
@@ -1238,7 +1222,14 @@ async function processAudio(){
     avatarRing.classList.add('pulse');
     callWave.className='call-wave ai-speaking';
 
-    await speakReply(reply);   // FIX: plain async fn, not async-in-Promise
+    try{
+      await speakReply(reply);
+    }catch(ttsErr){
+      // TTS failed — don't crash the call, just show the text and continue
+      console.error('TTS failed:', ttsErr.message);
+      callTranscript.textContent='💬 ' + reply;
+      await new Promise(r=>setTimeout(r,2500));
+    }
 
     avatarRing.classList.remove('pulse');
 
@@ -1261,12 +1252,12 @@ function resumeListening(){
   isSpeaking=false; speechStarted=false;
 }
 
-/* ── TTS playback via AudioContext.decodeAudioData (no blob URL) ──
-   FIX: this is now a plain async function.
-   The old code wrapped it in `new Promise(async (resolve) => {...})` which
-   is an anti-pattern — any thrown error inside just hangs the Promise forever,
-   freezing the call screen. Now errors propagate naturally to processAudio's
-   try/catch, and the finally block always resumes listening.                  */
+/* ── TTS playback ──
+   Tries AudioContext.decodeAudioData first (best for Capacitor/Android,
+   no blob URL needed). If that fails (common in desktop Chrome/Firefox
+   due to MP3 header quirks), falls back to a plain Audio element.
+   Either way errors are thrown so processAudio's try/catch handles them
+   gracefully and the call always continues.                               */
 async function speakReply(text){
   if(!speakerOn) return;
 
@@ -1285,11 +1276,13 @@ async function speakReply(text){
     throw new Error('TTS returned empty audio');
   }
 
-  // Try AudioContext first (best for Capacitor/Android)
-  // Fall back to Audio element if decodeAudioData fails (common in browser)
+  if(!speakerOn) return;
+
+  // ── Try AudioContext path (Capacitor-safe, no blob URL) ──
   try{
     const ctx = await resumeAudioCtx();
-    const audioBuffer = await ctx.decodeAudioData(arrayBuf.slice(0)); // .slice(0) = copy, avoids detached buffer
+    // .slice(0) makes a fresh copy — prevents "detached ArrayBuffer" errors
+    const audioBuffer = await ctx.decodeAudioData(arrayBuf.slice(0));
 
     stopCurrentAudio();
     if(!speakerOn) return;
@@ -1308,17 +1301,15 @@ async function speakReply(text){
     });
 
   } catch(decodeErr){
-    console.warn('AudioContext decode failed, falling back to Audio element:', decodeErr);
-
-    // Fallback: blob URL + Audio element
+    // ── Fallback: blob URL + Audio element (works in all browsers) ──
+    console.warn('AudioContext decode failed, using Audio element fallback:', decodeErr.message);
     const blob = new Blob([arrayBuf], {type:'audio/mpeg'});
     const url  = URL.createObjectURL(blob);
-
     return new Promise((resolve, reject) => {
       const audio = new Audio(url);
       audio.onended = () => { URL.revokeObjectURL(url); resolve(); };
-      audio.onerror = (e) => { URL.revokeObjectURL(url); reject(new Error('Audio playback error')); };
-      audio.play().catch(reject);
+      audio.onerror = () => { URL.revokeObjectURL(url); reject(new Error('Audio element playback failed')); };
+      audio.play().catch(e => { URL.revokeObjectURL(url); reject(e); });
     });
   }
 }
