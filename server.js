@@ -102,7 +102,7 @@ app.post('/api/name-chat', async (req, res) => {
   }
 });
 
-// ── TTS via ElevenLabs ─────────────────────────────────────────────────────────
+// ── TTS via ElevenLabs (RECTIFIED FOR STREAMING) ───────────────────────────────
 app.post('/api/tts', async (req, res) => {
   const { text } = req.body;
   if (!ELEVENLABS_API_KEY) return res.status(500).json({ error: 'ELEVENLABS_API_KEY not set' });
@@ -134,9 +134,16 @@ app.post('/api/tts', async (req, res) => {
       const err = await ttsRes.text();
       return res.status(502).json({ error: 'ElevenLabs error: ' + err });
     }
+    
     const audioBuffer = await ttsRes.arrayBuffer();
-    res.setHeader('Content-Type', 'audio/mpeg');
-    res.setHeader('Content-Length', audioBuffer.byteLength);
+    
+    // Set explicit headers for the browser audio player
+    res.set({
+      'Content-Type': 'audio/mpeg',
+      'Content-Length': audioBuffer.byteLength,
+      'Accept-Ranges': 'bytes'
+    });
+    
     res.send(Buffer.from(audioBuffer));
   } catch (err) {
     res.status(502).json({ error: err.message });
