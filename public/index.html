@@ -365,6 +365,22 @@ header {
 .call-btn.speaker   { background:var(--surface2); color:var(--dim); }
 .call-btn.speaker.active { background:#fff; color:#000; }
 
+  /* ── TTS ──*/
+setStatus('Speaking…', 'speaking');
+avatarRing.classList.add('pulse');
+callWave.className='call-wave ai-speaking';
+
+try{
+  await speakReply(reply);
+}catch(ttsErr){
+  // TTS failed — show the reply as text and keep going
+  console.error('TTS error:', ttsErr);
+  callTranscript.textContent='💬 (voice unavailable) '+reply;
+  await new Promise(r=>setTimeout(r,2000));
+}
+
+avatarRing.classList.remove('pulse');
+
 /* End */
 .call-btn.end { background:#ff3b30; color:#fff; width:72px; height:72px; }
 
