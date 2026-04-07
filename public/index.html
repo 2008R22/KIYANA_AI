@@ -12,7 +12,13 @@
   --text:#f0f0f0; --dim:#666; --accent:#fff;
   --sidebar-w:270px;
 }
-body { background:var(--bg); color:var(--text); font-family:'DM Sans',sans-serif; height:100vh; display:flex; overflow:hidden; }
+
+/* FIX #8: Use 100dvh so mobile keyboard push doesn't break layout */
+body {
+  background:var(--bg); color:var(--text); font-family:'DM Sans',sans-serif;
+  height:100vh; height:100dvh;
+  display:flex; overflow:hidden;
+}
 ::-webkit-scrollbar { width:4px; }
 ::-webkit-scrollbar-thumb { background:#2a2a2a; border-radius:2px; }
 
@@ -20,17 +26,20 @@ body { background:var(--bg); color:var(--text); font-family:'DM Sans',sans-serif
    SIDEBAR
 ═══════════════════════════════════════════════════════ */
 #sidebar {
-  width:var(--sidebar-w); height:100vh;
+  width:var(--sidebar-w); height:100vh; height:100dvh;
   background:var(--surface); border-right:1px solid var(--surface2);
   display:flex; flex-direction:column;
   position:fixed; left:0; top:0; z-index:300;
   transform:translateX(-100%); transition:transform .28s cubic-bezier(.4,0,.2,1);
   will-change:transform;
+  /* FIX #10: safe-area padding for iOS notch/home bar */
+  padding-bottom:env(safe-area-inset-bottom);
 }
 #sidebar.open { transform:translateX(0); }
 
 .sidebar-header {
   padding:24px 20px 16px;
+  padding-top:max(24px, calc(env(safe-area-inset-top) + 12px));
   border-bottom:1px solid var(--surface2);
   display:flex; justify-content:space-between; align-items:center;
 }
@@ -77,7 +86,6 @@ body { background:var(--bg); color:var(--text); font-family:'DM Sans',sans-serif
 
 .sidebar-empty { padding:32px 16px; text-align:center; color:var(--dim); font-size:.85rem; }
 
-/* Overlay behind sidebar on mobile */
 #sidebarMask {
   position:fixed; inset:0; background:rgba(0,0,0,.6);
   z-index:299; display:none;
@@ -89,12 +97,14 @@ body { background:var(--bg); color:var(--text); font-family:'DM Sans',sans-serif
 ═══════════════════════════════════════════════════════ */
 #main {
   flex:1; display:flex; flex-direction:column;
-  height:100vh; overflow:hidden;
+  height:100vh; height:100dvh; overflow:hidden;
   transition:margin-left .28s cubic-bezier(.4,0,.2,1);
 }
 
 header {
-  padding:16px 20px; display:flex; justify-content:space-between; align-items:center;
+  padding:16px 20px;
+  padding-top:max(16px, calc(env(safe-area-inset-top) + 8px));
+  display:flex; justify-content:space-between; align-items:center;
   border-bottom:1px solid var(--surface2);
   background:rgba(0,0,0,.92); backdrop-filter:blur(20px);
   flex-shrink:0; position:relative; z-index:10;
@@ -152,7 +162,11 @@ header {
 @keyframes pulse{0%,100%{opacity:.3}50%{opacity:1}}
 
 /* ── Input ────────────────────────────────────────────── */
-.input-section { padding:10px 14px 18px; border-top:1px solid var(--surface2); flex-shrink:0; }
+.input-section {
+  padding:10px 14px 18px;
+  padding-bottom:max(18px, calc(env(safe-area-inset-bottom) + 10px));
+  border-top:1px solid var(--surface2); flex-shrink:0;
+}
 .input-bar {
   max-width:800px; margin:0 auto;
   background:var(--surface); border:1px solid var(--surface2);
@@ -250,20 +264,20 @@ header {
 .shake-hint.show { opacity:1; }
 
 /* ═══════════════════════════════════════════════════════
-   CALL SCREEN  — full-screen phone-call feel
+   CALL SCREEN
 ═══════════════════════════════════════════════════════ */
 #callScreen {
   position:fixed; inset:0; z-index:6000;
   background:linear-gradient(160deg,#0d0d0d 0%,#111 100%);
   display:none; flex-direction:column;
   align-items:center; justify-content:space-between;
-  padding:56px 28px 48px;
+  /* FIX #10: safe area for notch + home bar */
+  padding:max(56px, calc(env(safe-area-inset-top) + 40px)) 28px max(48px, calc(env(safe-area-inset-bottom) + 32px));
 }
 #callScreen.show { display:flex; }
 
 .call-top { display:flex; flex-direction:column; align-items:center; gap:14px; width:100%; }
 
-/* Animated avatar ring */
 .call-avatar-wrap { position:relative; width:120px; height:120px; }
 .avatar-ring {
   position:absolute; inset:-8px; border-radius:50%;
@@ -274,7 +288,7 @@ header {
   animation:ringPulse 1.4s ease-in-out infinite;
 }
 @keyframes ringPulse {
-  0%,100% { transform:scale(1);   opacity:.6; }
+  0%,100% { transform:scale(1); opacity:.6; }
   50%      { transform:scale(1.12); opacity:1; }
 }
 .call-avatar {
@@ -289,7 +303,6 @@ header {
 .call-name { font-family:'Syne',sans-serif; font-size:1.7rem; font-weight:800; letter-spacing:.04em; }
 .call-timer { font-size:.85rem; color:var(--dim); font-variant-numeric:tabular-nums; letter-spacing:.06em; }
 
-/* Live waveform */
 .call-wave { display:flex; align-items:center; gap:3px; height:32px; }
 .wave-bar {
   width:3px; border-radius:2px; background:#2a2a2a;
@@ -313,7 +326,6 @@ header {
 
 .call-wave.user-speaking .wave-bar { background:#888; animation:waveAnim .4s ease-in-out infinite alternate; }
 
-/* Transcript card */
 .call-card {
   width:100%; max-width:360px;
   background:rgba(255,255,255,.04);
@@ -326,13 +338,11 @@ header {
   text-align:center; transition:.2s;
 }
 
-/* Status badge */
 .call-status-badge {
   font-size:.78rem; letter-spacing:.1em; color:var(--dim);
   text-transform:uppercase;
 }
 
-/* Bottom controls */
 .call-controls { display:flex; gap:20px; align-items:center; }
 
 .call-btn {
@@ -342,13 +352,10 @@ header {
 }
 .call-btn svg { width:24px; height:24px; }
 .call-btn:active { transform:scale(.9); }
-
 .call-btn.mute   { background:var(--surface2); color:var(--text); }
 .call-btn.mute.on { background:#fff; color:#000; }
-
 .call-btn.speaker { background:var(--surface2); color:var(--text); }
 .call-btn.speaker.on { background:#fff; color:#000; }
-
 .call-btn.end { background:#ff3b30; color:#fff; }
 </style>
 </head>
@@ -452,13 +459,10 @@ header {
       <div class="wave-bar"></div>
     </div>
   </div>
-
   <div class="call-card">
     <p id="callTranscript">Tap the mic to start talking…</p>
   </div>
-
   <div class="call-status-badge" id="callStatusBadge">Ready</div>
-
   <div class="call-controls">
     <button class="call-btn speaker on" id="speakerBtn" title="Speaker">
       <svg fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>
@@ -520,8 +524,8 @@ const ACTIVE_ID_KEY = 'kiyana_active_id';
 ═══════════════════════════════════════════════════════════════════════════ */
 let sessions     = JSON.parse(localStorage.getItem(SESSIONS_KEY) || '[]');
 let imgHistory   = JSON.parse(localStorage.getItem(IMG_KEY)      || '[]');
-let currentId    = null;   // active session id
-let messages     = [];     // current session messages
+let currentId    = null;
+let messages     = [];
 let pendingBase64= null;
 
 const viewport     = document.getElementById('viewport');
@@ -532,56 +536,45 @@ const imgPreview   = document.getElementById('imgPreview');
 const previewThumb = document.getElementById('previewThumb');
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   SESSIONS
+   SESSION HELPERS
 ═══════════════════════════════════════════════════════════════════════════ */
-function saveSessions() { localStorage.setItem(SESSIONS_KEY, JSON.stringify(sessions)); }
-function saveImgs()     { localStorage.setItem(IMG_KEY,      JSON.stringify(imgHistory)); }
+function saveSessions(){ localStorage.setItem(SESSIONS_KEY, JSON.stringify(sessions)); }
+function saveImgs()    { localStorage.setItem(IMG_KEY, JSON.stringify(imgHistory.slice(0,40))); }
+function getSession(id){ return sessions.find(s => s.id === id); }
 
-function getSession(id) { return sessions.find(s => s.id === id); }
+function persistCurrentMessages(){
+  if(!currentId) return;
+  const s = getSession(currentId);
+  if(s){ s.messages = JSON.parse(JSON.stringify(messages)); s.ts = Date.now(); saveSessions(); }
+}
 
-function createNewSession() {
-  // Save current before switching
-  persistCurrentMessages();
-  const id = Date.now();
-  const sess = { id, ts: Date.now(), name: 'New Chat', messages: [] };
-  sessions.unshift(sess);
+function createNewSession(){
+  const id  = Date.now();
+  const s   = { id, name:'New Chat', ts:id, messages:[] };
+  sessions.unshift(s);
   saveSessions();
   currentId = id;
   messages  = [];
   viewport.innerHTML = '';
-  addMsg('ai', buildContextualGreeting());
+  renderMsg('ai', buildContextualGreeting());
+  persistCurrentMessages();
   renderSidebar();
-  return id;
 }
 
-function persistCurrentMessages() {
-  if (!currentId) return;
-  const s = getSession(currentId);
-  if (s) {
-    s.messages = JSON.parse(JSON.stringify(messages));
-    s.ts       = Date.now();
-    saveSessions();
-  }
-}
-
-// Auto-name via Groq after first exchange
-async function autoNameSession(id) {
+/* FIX #12: Only auto-name once, on the very first user→AI exchange.
+   Previously fired on every single AI reply — wasted API calls. */
+async function autoNameSession(id){
   const s = getSession(id);
-  if (!s || s.name !== 'New Chat') return;
-  const relevant = s.messages.filter(m => m.role === 'user' || m.role === 'assistant').slice(0, 4);
-  if (relevant.length < 2) return;
-  try {
-    const res  = await fetch(`${API}/api/name-chat`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ messages: relevant.map(m => ({ role: m.role, content: m.text })) })
+  if(!s || s.name !== 'New Chat') return;
+  if(messages.filter(m => m.role === 'user').length !== 1) return;
+  try{
+    const res = await fetch(`${API}/api/name-chat`,{
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({ messages: messages.slice(0,4).map(m=>({role:m.role,content:m.text})) })
     });
     const data = await res.json();
-    if (data.name && data.name !== 'Chat') {
-      s.name = data.name;
-      saveSessions();
-      renderSidebar();
-    }
-  } catch(e) {}
+    if(data.name && s){ s.name = data.name; saveSessions(); renderSidebar(); }
+  }catch(e){}
 }
 
 function loadSession(id) {
@@ -603,7 +596,6 @@ function deleteSession(e, id) {
   sessions = sessions.filter(s => s.id !== id);
   saveSessions();
   if (id === currentId) {
-    // Switch to newest remaining or create fresh
     if (sessions.length) {
       loadSession(sessions[0].id);
     } else {
@@ -669,19 +661,32 @@ function buildContextualGreeting() {
 
 /* ═══════════════════════════════════════════════════════════════════════════
    SHAKE TO LOCK
+   FIX #11: iOS 13+ requires DeviceMotionEvent.requestPermission() on a
+            user gesture. We attach the listener lazily when permission is
+            granted, instead of at page load (where it silently never fires).
 ═══════════════════════════════════════════════════════════════════════════ */
 let lockEnabled=localStorage.getItem(LOCK_KEY)==='true', storedPin=localStorage.getItem(PIN_KEY)||'';
 let isLocked=false,pinEntry='',setupEntry='',setupPhase=0,setupFirst='';
 let lastX=0,lastY=0,lastZ=0,shakeTs=0;
 
-window.addEventListener('devicemotion',e=>{
-  if(!lockEnabled||isLocked) return;
-  const {x,y,z}=e.accelerationIncludingGravity||{};
-  if(x==null) return;
-  const delta=Math.abs(x-lastX)+Math.abs(y-lastY)+Math.abs(z-lastZ);
-  lastX=x;lastY=y;lastZ=z;
-  if(delta>18&&Date.now()-shakeTs>2000){shakeTs=Date.now();triggerLock();}
-});
+function attachShakeListener(){
+  window.addEventListener('devicemotion',e=>{
+    if(!lockEnabled||isLocked) return;
+    const {x,y,z}=e.accelerationIncludingGravity||{};
+    if(x==null) return;
+    const delta=Math.abs(x-lastX)+Math.abs(y-lastY)+Math.abs(z-lastZ);
+    lastX=x;lastY=y;lastZ=z;
+    if(delta>18&&Date.now()-shakeTs>2000){shakeTs=Date.now();triggerLock();}
+  });
+}
+
+// Attach immediately on non-iOS; defer to permission request on iOS 13+
+if(typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function'){
+  window._needsMotionPermission = true;
+} else {
+  attachShakeListener();
+  window._needsMotionPermission = false;
+}
 
 function showShakeHint(){const h=document.getElementById('shakeHint');h.classList.add('show');setTimeout(()=>h.classList.remove('show'),2500);}
 function triggerLock(){if(!storedPin)return;isLocked=true;pinEntry='';updatePinDots('pinDots',0);document.getElementById('pinError').textContent='';document.getElementById('lockScreen').classList.add('show');}
@@ -700,36 +705,86 @@ buildPinPad('setupPad',d=>{
     }
   }
 },()=>{setupEntry=setupEntry.slice(0,-1);updatePinDots('setupDots',setupEntry.length);});
+
 function updateLockUI(){const t=document.getElementById('lockToggle'),s=document.getElementById('lockSub');t.classList.toggle('on',lockEnabled);s.textContent=lockEnabled?'Shake phone to lock · PIN is set':'Shake phone to lock chat with PIN';}
 updateLockUI();
-document.getElementById('lockToggle').onclick=()=>{if(!lockEnabled){setupEntry='';setupPhase=0;setupFirst='';updatePinDots('setupDots',0);document.getElementById('setupError').textContent='Enter a 4-digit PIN';document.getElementById('pinSetupOverlay').classList.add('show');document.getElementById('settingsOverlay').classList.remove('show');}else{lockEnabled=false;storedPin='';localStorage.removeItem(PIN_KEY);localStorage.setItem(LOCK_KEY,'false');updateLockUI();}};
+
+document.getElementById('lockToggle').onclick = async () => {
+  if(!lockEnabled){
+    // FIX #11: Request motion permission on iOS before proceeding
+    if(window._needsMotionPermission){
+      try{
+        const perm = await DeviceMotionEvent.requestPermission();
+        if(perm === 'granted'){
+          attachShakeListener();
+          window._needsMotionPermission = false;
+        } else {
+          alert('Motion permission denied. Shake-to-lock requires motion access.');
+          return;
+        }
+      }catch(e){ console.warn('Motion permission error', e); }
+    }
+    setupEntry='';setupPhase=0;setupFirst='';updatePinDots('setupDots',0);
+    document.getElementById('setupError').textContent='Enter a 4-digit PIN';
+    document.getElementById('pinSetupOverlay').classList.add('show');
+    document.getElementById('settingsOverlay').classList.remove('show');
+  } else {
+    lockEnabled=false;storedPin='';localStorage.removeItem(PIN_KEY);localStorage.setItem(LOCK_KEY,'false');updateLockUI();
+  }
+};
 document.getElementById('cancelPinSetup').onclick=()=>{document.getElementById('pinSetupOverlay').classList.remove('show');setupEntry='';setupPhase=0;};
 
 /* ═══════════════════════════════════════════════════════════════════════════
    RENDER HELPERS
+   FIX #14: Download buttons use a keyed lookup map instead of embedding
+             base64 strings inside onclick attributes — avoids memory bloat
+             and attribute-escaping issues with large data URIs.
 ═══════════════════════════════════════════════════════════════════════════ */
-function renderMsg(role,text,imageUrl,isUserImg){
-  const div=document.createElement('div');div.className=`msg ${role}`;
-  let imgHtml='';
+const _dlUrlMap = {};
+
+function renderMsg(role, text, imageUrl, isUserImg){
+  const div = document.createElement('div');
+  div.className = `msg ${role}`;
+
+  // Build the bubble. Use a placeholder span for text so we can set via
+  // textContent (safe against XSS) rather than innerHTML injection.
+  let imgHtml = '';
   if(imageUrl){
-    const safeUrl=imageUrl.startsWith('data:')?imageUrl:escHtml(imageUrl);
-    imgHtml=`<div class="img-wrap"><img src="${safeUrl}" alt="">
-      ${!isUserImg?`<button class="dl-btn" onclick="dlImg('${safeUrl}')">
-        <svg fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-      </button>`:''}
-    </div>`;
+    const safeUrl = imageUrl.startsWith('data:') ? imageUrl : escHtml(imageUrl);
+    if(!isUserImg){
+      const dlKey = '_dl_' + Date.now() + '_' + Math.random().toString(36).slice(2);
+      _dlUrlMap[dlKey] = imageUrl;
+      imgHtml = `<div class="img-wrap">
+        <img src="${safeUrl}" alt="" loading="lazy">
+        <button class="dl-btn" data-dlkey="${dlKey}">
+          <svg fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        </button>
+      </div>`;
+    } else {
+      imgHtml = `<div class="img-wrap"><img src="${safeUrl}" alt="" loading="lazy"></div>`;
+    }
   }
-  div.innerHTML=`<div class="bubble">${escHtml(text)}${imgHtml}</div>`;
-  viewport.appendChild(div);viewport.scrollTop=viewport.scrollHeight;
+
+  div.innerHTML = `<div class="bubble"><span class="bubble-text"></span>${imgHtml}</div>`;
+  div.querySelector('.bubble-text').textContent = text;
+  viewport.appendChild(div);
+  viewport.scrollTop = viewport.scrollHeight;
 }
 
-function addMsg(role,text,imageUrl,isUserImg){
-  const entry={role,text,imageUrl,isUserImg};
+// FIX #14: Delegated click handler — one listener handles all download buttons
+viewport.addEventListener('click', e => {
+  const btn = e.target.closest('.dl-btn');
+  if(!btn) return;
+  const url = _dlUrlMap[btn.dataset.dlkey];
+  if(url) dlImg(url);
+});
+
+function addMsg(role, text, imageUrl, isUserImg){
+  const entry = { role, text, imageUrl, isUserImg };
   messages.push(entry);
-  renderMsg(role,text,imageUrl,isUserImg);
-  // Persist & auto-name after every exchange
+  renderMsg(role, text, imageUrl, isUserImg);
   persistCurrentMessages();
-  if(role==='assistant') autoNameSession(currentId);
+  if(role === 'assistant') autoNameSession(currentId);
 }
 
 function escHtml(s=''){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
@@ -751,21 +806,24 @@ async function dlImg(url){
   }catch(e){}
 }
 
+/* FIX #13: Include ALL messages in context history, not just text-only ones.
+   Previously, messages after an image were silently dropped from context,
+   breaking conversation continuity after any image interaction. */
 function buildHistory(){
-  return messages.filter(m=>!m.isUserImg&&!m.imageUrl).slice(-20).map(m=>({
-    role:m.role==='user'?'user':'assistant',content:m.text
-  }));
+  return messages.slice(-20)
+    .map(m => ({ role: m.role === 'user' ? 'user' : 'assistant', content: m.text || '' }))
+    .filter(m => m.content);
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
    CHAT API
 ═══════════════════════════════════════════════════════════════════════════ */
-async function sendChat(text,base64){
-  thinkLabel.textContent='Thinking';thinking.style.display='flex';
+async function sendChat(text, base64){
+  thinkLabel.textContent='Thinking'; thinking.style.display='flex';
   try{
     const res=await fetch(`${API}/api/chat`,{
-      method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({message:text,imageBase64:base64||undefined,history:base64?undefined:buildHistory()})
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({message:text, imageBase64:base64||undefined, history:base64?undefined:buildHistory()})
     });
     const data=await res.json();
     if(!res.ok||data.error){addMsg('ai','Error: '+(data.error||'Something went wrong'));return null;}
@@ -775,18 +833,23 @@ async function sendChat(text,base64){
 }
 
 async function onSend(){
-  const text=msgInput.value.trim();if(!text&&!pendingBase64)return;
-  const b64=pendingBase64;const imgSrc=b64?`data:image/jpeg;base64,${b64}`:null;
-  addMsg('user',text||'Analyzing image…',imgSrc,!!b64);
-  msgInput.value='';msgInput.style.height='auto';pendingBase64=null;imgPreview.style.display='none';
+  const text=msgInput.value.trim(); if(!text&&!pendingBase64)return;
+  const b64=pendingBase64; const imgSrc=b64?`data:image/jpeg;base64,${b64}`:null;
+  addMsg('user', text||'Analyzing image…', imgSrc, !!b64);
+  msgInput.value='';
+  // FIX #9: Defer height reset to next frame so layout has settled
+  requestAnimationFrame(() => { msgInput.style.height='auto'; });
+  pendingBase64=null; imgPreview.style.display='none';
   const reply=await sendChat(text,b64);
-  if(reply)addMsg('ai',reply);
+  if(reply) addMsg('ai', reply);
 }
 
 async function onGenerate(){
-  const prompt=msgInput.value.trim();if(!prompt)return;
-  addMsg('user','Generate image: '+prompt);msgInput.value='';msgInput.style.height='auto';
-  thinkLabel.textContent='Painting';thinking.style.display='flex';
+  const prompt=msgInput.value.trim(); if(!prompt)return;
+  addMsg('user','Generate image: '+prompt);
+  msgInput.value='';
+  requestAnimationFrame(() => { msgInput.style.height='auto'; }); // FIX #9
+  thinkLabel.textContent='Painting'; thinking.style.display='flex';
   try{
     const res=await fetch(`${API}/api/generate-image`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({prompt})});
     const data=await res.json();
@@ -797,17 +860,13 @@ async function onGenerate(){
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   LIVE CALL — always-on, VAD (silence detection), real phone-call feel
-   Flow: mic open → detect speech start → record → detect silence → send → reply → repeat
-═══════════════════════════════════════════════════════════════════════════ */
-/* ═══════════════════════════════════════════════════════════════════════════
-   LIVE CALL — Always-on, VAD, Real phone-call feel
+   LIVE CALL — VAD + TTS
 ═══════════════════════════════════════════════════════════════════════════ */
 let callActive    = false;
 let callHistory   = [];
 let speakerOn     = true;
-let isProcessing  = false;   
-let currentAudio  = null;
+let isProcessing  = false;
+let currentAudio  = null;   // now a BufferSource node, not an Audio element
 let callTimerInt  = null;
 let callSeconds   = 0;
 
@@ -818,14 +877,19 @@ let analyser        = null;
 let vadInterval     = null;
 let mediaRecorder   = null;
 let audioChunks     = [];
-let isSpeaking      = false;   
+let isSpeaking      = false;
 let silenceTimer    = null;
 let speechStarted   = false;
+let recordingActive = false; // FIX #7: prevent double-start
 
-// VAD thresholds
-const SPEECH_THRESHOLD  = 18;   
-const SILENCE_MS        = 1200; 
-const MIN_SPEECH_MS     = 400;  
+/* FIX #4: SPEECH_THRESHOLD lowered 18 → 6.
+   RMS of 512-sample time-domain data (0–255 centred at 128) at normal
+   speech levels sits in the 3–12 range. 18 was far too high for quiet
+   speakers and missed most real speech.
+   FIX #5: MIN_SPEECH_MS is now actually enforced in the VAD loop below. */
+const SPEECH_THRESHOLD  = 6;
+const SILENCE_MS        = 1200;
+const MIN_SPEECH_MS     = 400;
 
 const callScreen     = document.getElementById('callScreen');
 const callTranscript = document.getElementById('callTranscript');
@@ -851,14 +915,13 @@ function stopCallTimer(){ clearInterval(callTimerInt); callTimerInt=null; }
 
 // ── Open call ────────────────────────────────────────────────────────────────
 document.getElementById('callBtn').onclick = async () => {
-  // CRITICAL FIX: Unlock AudioContext on User Gesture
-  if (!audioCtx) {
+  // FIX #1/#2: Create + resume AudioContext on user gesture (required by browsers)
+  if(!audioCtx){
     audioCtx = new (window.AudioContext || window.webkitAudioContext)();
   }
-  if (audioCtx.state === 'suspended') {
+  if(audioCtx.state === 'suspended'){
     await audioCtx.resume();
   }
-
   callScreen.classList.add('show');
   callActive=true; callHistory=[]; speakerOn=true;
   speakerBtn.classList.add('on');
@@ -874,7 +937,12 @@ endCallBtn.onclick = () => { endCall(); };
 function endCall(){
   callActive=false;
   stopMic();
-  if(currentAudio){ currentAudio.pause(); currentAudio.src = ""; currentAudio=null; }
+  // FIX #3: Stop the BufferSource node cleanly (no blob URL race condition)
+  if(currentAudio){
+    try{ currentAudio.stop(); }catch(e){}
+    try{ currentAudio.disconnect(); }catch(e){}
+    currentAudio = null;
+  }
   isProcessing=false;
   stopCallTimer();
   callScreen.classList.remove('show');
@@ -895,21 +963,22 @@ async function startMic(){
       audio:{ echoCancellation:true, noiseSuppression:true, autoGainControl:true }
     });
 
-    // Re-verify AudioContext is active
-    if (audioCtx.state === 'suspended') await audioCtx.resume();
-    
-    analyser  = audioCtx.createAnalyser();
+    if(audioCtx.state === 'suspended') await audioCtx.resume();
+
+    analyser = audioCtx.createAnalyser();
     analyser.fftSize = 512;
     const source = audioCtx.createMediaStreamSource(micStream);
     source.connect(analyser);
 
     setStatus('Listening…');
-    callTranscript.textContent='Go ahead, I\'m listening…';
+    callTranscript.textContent = "Go ahead, I'm listening…";
     callWave.className='call-wave user-speaking';
 
     const dataArray = new Uint8Array(analyser.fftSize);
+    let speechStartTs = 0; // FIX #5: track when speech began
+
     vadInterval = setInterval(()=>{
-      if(!callActive||isProcessing) return;
+      if(!callActive || isProcessing) return;
       analyser.getByteTimeDomainData(dataArray);
 
       let sum=0;
@@ -924,6 +993,7 @@ async function startMic(){
         if(!isSpeaking){
           isSpeaking=true;
           speechStarted=true;
+          speechStartTs = Date.now();
           startRecording();
         }
       } else {
@@ -931,7 +1001,17 @@ async function startMic(){
           silenceTimer=setTimeout(()=>{
             isSpeaking=false;
             silenceTimer=null;
-            if(speechStarted){ stopRecordingAndSend(); }
+            if(speechStarted){
+              // FIX #5: Enforce minimum speech duration — discard short noise bursts
+              if((Date.now() - speechStartTs) >= MIN_SPEECH_MS){
+                stopRecordingAndSend();
+              } else {
+                speechStarted=false;
+                if(mediaRecorder && mediaRecorder.state!=='inactive') mediaRecorder.stop();
+                audioChunks=[];
+                recordingActive=false;
+              }
+            }
           }, SILENCE_MS);
         }
       }
@@ -949,32 +1029,42 @@ function stopMic(){
   if(mediaRecorder && mediaRecorder.state!=='inactive') mediaRecorder.stop();
   if(micStream) micStream.getTracks().forEach(t=>t.stop());
   isSpeaking=false; speechStarted=false; audioChunks=[];
+  recordingActive=false;
 }
 
 // ── Recording ────────────────────────────────────────────────────────────────
 function startRecording(){
-  if(!micStream) return;
-  audioChunks=[];
+  // FIX #6/#7: Guard against double-start
+  if(!micStream || recordingActive) return;
+  recordingActive=true;
+  audioChunks=[]; // FIX #7: Clear at start so previous utterance chunks don't leak
   const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus') ? 'audio/webm;codecs=opus' : 'audio/webm';
-
   try{
-    mediaRecorder = new MediaRecorder(micStream,{mimeType});
-    mediaRecorder.ondataavailable = e=>{if(e.data&&e.data.size>0) audioChunks.push(e.data);};
+    mediaRecorder = new MediaRecorder(micStream, {mimeType});
+    mediaRecorder.ondataavailable = e => { if(e.data && e.data.size>0) audioChunks.push(e.data); };
+    mediaRecorder.onstop = () => { recordingActive=false; };
     mediaRecorder.start(100);
     callWave.className='call-wave user-speaking';
-  }catch(e){ console.error('MediaRecorder error',e); }
+  }catch(e){
+    console.error('MediaRecorder error',e);
+    recordingActive=false;
+  }
 }
 
 function stopRecordingAndSend(){
   speechStarted=false;
-  if(!mediaRecorder||mediaRecorder.state==='inactive'){ return; }
-  mediaRecorder.onstop = ()=>{ processAudio(); };
+  // FIX #6: Only call stop() if recorder is actually active
+  if(!mediaRecorder || mediaRecorder.state==='inactive'){
+    recordingActive=false;
+    return;
+  }
+  mediaRecorder.onstop = () => { recordingActive=false; processAudio(); };
   mediaRecorder.stop();
 }
 
 // ── Process: STT → Groq → TTS ────────────────────────────────────────────────
 async function processAudio(){
-  if(!audioChunks.length||!callActive){ resumeListening(); return; }
+  if(!audioChunks.length || !callActive){ resumeListening(); return; }
 
   isProcessing=true;
   callWave.className='call-wave';
@@ -982,8 +1072,8 @@ async function processAudio(){
   callTranscript.textContent='…';
 
   try{
-    const mimeType = audioChunks[0]?.type || 'audio/webm';
-    const audioBlob = new Blob(audioChunks,{type:mimeType});
+    const mimeType  = audioChunks[0]?.type || 'audio/webm';
+    const audioBlob = new Blob(audioChunks, {type:mimeType});
     audioChunks=[];
 
     if(audioBlob.size < 800){ resumeListening(); isProcessing=false; return; }
@@ -993,13 +1083,13 @@ async function processAudio(){
       headers:{'Content-Type':mimeType},
       body:audioBlob
     });
-    const sttData  = await sttRes.json();
+    const sttData    = await sttRes.json();
     const transcript = (sttData.transcript||'').trim();
 
     if(!transcript){ resumeListening(); isProcessing=false; return; }
 
     callTranscript.textContent='🗣 '+transcript;
-    callHistory.push({role:'user',content:transcript});
+    callHistory.push({role:'user', content:transcript});
 
     setStatus('Thinking…');
     const chatRes = await fetch(`${API}/api/chat`,{
@@ -1008,15 +1098,15 @@ async function processAudio(){
     });
     const chatData = await chatRes.json();
     const reply = (chatData.content||'Sorry.').replace(/[*_~`#>]/g,'');
-    callHistory.push({role:'assistant',content:reply});
+    callHistory.push({role:'assistant', content:reply});
     callTranscript.textContent='💬 '+reply;
 
     setStatus('Speaking…');
     avatarRing.classList.add('pulse');
     callWave.className='call-wave ai-speaking';
-    
+
     await speakReply(reply);
-    
+
     avatarRing.classList.remove('pulse');
 
   }catch(err){
@@ -1035,35 +1125,70 @@ function resumeListening(){
   isSpeaking=false; speechStarted=false;
 }
 
-// ── Play TTS audio (REFIXED) ──────────────────────────────────────────────────
+/* ── TTS Playback ────────────────────────────────────────────────────────────
+   FIX #1: Route audio through AudioContext.decodeAudioData + BufferSource
+            instead of `new Audio(url)`. On iOS Safari, a plain Audio element
+            created after an AudioContext exists plays into a different pipeline
+            and can be silenced by the system. Using AudioContext exclusively
+            keeps everything on the same audio graph.
+
+   FIX #2: Guard against null audioCtx in case speakReply is ever called
+            outside the call flow.
+
+   FIX #3: No blob URL is created, so the Android blob-URL race condition
+            (revoking while still loading) is completely eliminated.
+            decodeAudioData works directly on the ArrayBuffer.
+*/
 async function speakReply(text){
-  return new Promise(async(resolve)=>{
+  return new Promise(async (resolve) => {
     if(!speakerOn) return resolve();
+
+    // FIX #2: Ensure AudioContext exists and is running
+    if(!audioCtx){
+      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    }
+    if(audioCtx.state === 'suspended'){
+      try{ await audioCtx.resume(); }catch(e){}
+    }
+
     try{
-      const ttsRes=await fetch(`${API}/api/tts`,{
+      const ttsRes = await fetch(`${API}/api/tts`,{
         method:'POST', headers:{'Content-Type':'application/json'},
         body:JSON.stringify({text})
       });
       if(!ttsRes.ok) throw new Error('TTS fail');
-      
-      const blob=await ttsRes.blob();
-      const url=URL.createObjectURL(blob);
-      
-      if(currentAudio){ currentAudio.pause(); currentAudio.src=""; }
 
-      currentAudio=new Audio(url);
-      
-      // Ensure AudioContext is resumed before playing
-      if (audioCtx && audioCtx.state === 'suspended') await audioCtx.resume();
+      // FIX #3: Decode directly from ArrayBuffer — no blob URL needed
+      const arrayBuf    = await ttsRes.arrayBuffer();
+      const audioBuffer = await audioCtx.decodeAudioData(arrayBuf);
 
-      currentAudio.onended=()=>{ URL.revokeObjectURL(url); currentAudio=null; resolve(); };
-      currentAudio.onerror=()=>{ URL.revokeObjectURL(url); resolve(); };
-      
-      console.log("AudioContext State:", audioCtx.state);
-      await currentAudio.play();
-    }catch(e){ resolve(); }
+      // Stop any currently-playing audio cleanly before starting new
+      if(currentAudio){
+        try{ currentAudio.stop(); }catch(e){}
+        try{ currentAudio.disconnect(); }catch(e){}
+        currentAudio = null;
+      }
+
+      const source = audioCtx.createBufferSource();
+      source.buffer = audioBuffer;
+      source.connect(audioCtx.destination);
+      currentAudio = source; // store ref so endCall() can abort it
+
+      source.onended = () => {
+        source.disconnect();
+        if(currentAudio === source) currentAudio = null;
+        resolve();
+      };
+
+      source.start(0);
+
+    }catch(e){
+      console.error('speakReply error', e);
+      resolve();
+    }
   });
 }
+
 /* ═══════════════════════════════════════════════════════════════════════════
    PERSIST ON HIDE
 ═══════════════════════════════════════════════════════════════════════════ */
@@ -1073,30 +1198,33 @@ window.addEventListener('pagehide', persistCurrentMessages);
 /* ═══════════════════════════════════════════════════════════════════════════
    SETTINGS / EVENTS
 ═══════════════════════════════════════════════════════════════════════════ */
-document.getElementById('settingsBtn').onclick   = ()=>document.getElementById('settingsOverlay').classList.add('show');
+document.getElementById('settingsBtn').onclick    = ()=>document.getElementById('settingsOverlay').classList.add('show');
 document.getElementById('closeSettings').onclick  = ()=>document.getElementById('settingsOverlay').classList.remove('show');
 document.getElementById('settingsOverlay').onclick= e=>{if(e.target.id==='settingsOverlay')e.target.classList.remove('show');};
 document.getElementById('pinSetupOverlay').onclick= e=>{if(e.target.id==='pinSetupOverlay'){e.target.classList.remove('show');setupEntry='';setupPhase=0;}};
 
 document.getElementById('analyzeBtn').onclick=()=>document.getElementById('fileInput').click();
 document.getElementById('fileInput').onchange=e=>{
-  const file=e.target.files[0];if(!file)return;
+  const file=e.target.files[0]; if(!file)return;
   const reader=new FileReader();
   reader.onload=f=>{pendingBase64=f.target.result.split(',')[1];previewThumb.src=f.target.result;imgPreview.style.display='flex';msgInput.focus();};
-  reader.readAsDataURL(file);e.target.value='';
+  reader.readAsDataURL(file); e.target.value='';
 };
 document.getElementById('clearImg').onclick=()=>{pendingBase64=null;imgPreview.style.display='none';};
 document.getElementById('genBtn').onclick =onGenerate;
 document.getElementById('sendBtn').onclick=onSend;
 msgInput.onkeydown=e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();onSend();}};
-msgInput.oninput=function(){this.style.height='auto';this.style.height=Math.min(this.scrollHeight,120)+'px';};
+// FIX #9: height auto-resize without flicker
+msgInput.oninput=function(){
+  this.style.height='auto';
+  this.style.height=Math.min(this.scrollHeight,120)+'px';
+};
 
 /* ═══════════════════════════════════════════════════════════════════════════
    BOOT — restore last session or create new
 ═══════════════════════════════════════════════════════════════════════════ */
 (function boot(){
   if(sessions.length){
-    // restore most recent session
     const s=sessions[0];
     currentId=s.id;
     messages=JSON.parse(JSON.stringify(s.messages));
@@ -1105,7 +1233,7 @@ msgInput.oninput=function(){this.style.height='auto';this.style.height=Math.min(
       viewport.scrollTop=viewport.scrollHeight;
     } else {
       renderMsg('ai',buildContextualGreeting());
-      messages[messages.length-1] && persistCurrentMessages();
+      persistCurrentMessages();
     }
   } else {
     createNewSession();
