@@ -1270,37 +1270,57 @@ function resumeListening(){
 async function speakReply(text){
   if(!speakerOn) return;
 
-  const ctx = await resumeAudioCtx();
-
   const ttsRes = await fetch(`${API}/api/tts`,{
     method:'POST', headers:{'Content-Type':'application/json'},
     body:JSON.stringify({text})
   });
-  if(!ttsRes.ok) throw new Error(`TTS HTTP ${ttsRes.status}`);
 
-  // Decode directly from ArrayBuffer — no blob URL needed (Capacitor-safe)
-  const arrayBuf    = await ttsRes.arrayBuffer();
-  const audioBuffer = await ctx.decodeAudioData(arrayBuf);
+  if(!ttsRes.ok){
+    const errText = await ttsRes.text();
+    throw new Error(`TTS ${ttsRes.status}: ${errText}`);
+  }
 
-  // Stop any currently-playing audio before starting new
-  stopCurrentAudio();
+  const arrayBuf = await ttsRes.arrayBuffer();
+  if(!arrayBuf || arrayBuf.byteLength < 100){
+    throw new Error('TTS returned empty audio');
+  }
 
-  if(!speakerOn) return; // user may have toggled speaker off while we were fetching
+  // Try AudioContext first (best for Capacitor/Android)
+  // Fall back to Audio element if decodeAudioData fails (common in browser)
+  try{
+    const ctx = await resumeAudioCtx();
+    const audioBuffer = await ctx.decodeAudioData(arrayBuf.slice(0)); // .slice(0) = copy, avoids detached buffer
 
-  return new Promise(resolve => {
-    const source = ctx.createBufferSource();
-    source.buffer = audioBuffer;
-    source.connect(ctx.destination);
-    currentSource = source;
+    stopCurrentAudio();
+    if(!speakerOn) return;
 
-    source.onended = () => {
-      source.disconnect();
-      if(currentSource === source) currentSource = null;
-      resolve();
-    };
+    return new Promise(resolve => {
+      const source = ctx.createBufferSource();
+      source.buffer = audioBuffer;
+      source.connect(ctx.destination);
+      currentSource = source;
+      source.onended = () => {
+        source.disconnect();
+        if(currentSource === source) currentSource = null;
+        resolve();
+      };
+      source.start(0);
+    });
 
-    source.start(0);
-  });
+  } catch(decodeErr){
+    console.warn('AudioContext decode failed, falling back to Audio element:', decodeErr);
+
+    // Fallback: blob URL + Audio element
+    const blob = new Blob([arrayBuf], {type:'audio/mpeg'});
+    const url  = URL.createObjectURL(blob);
+
+    return new Promise((resolve, reject) => {
+      const audio = new Audio(url);
+      audio.onended = () => { URL.revokeObjectURL(url); resolve(); };
+      audio.onerror = (e) => { URL.revokeObjectURL(url); reject(new Error('Audio playback error')); };
+      audio.play().catch(reject);
+    });
+  }
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
