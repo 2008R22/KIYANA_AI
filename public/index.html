@@ -445,20 +445,19 @@ function createNewSession(){
   renderSidebar();
 }
 
-/* Auto-name: fires after every AI reply until a real name sticks */
+/* Auto-name: fires once after exactly 6 user messages have been sent */
 async function autoNameSession(id){
   const s = getSession(id);
   if(!s || s.name !== 'New Chat') return;
-  // Need at least one user message and one AI reply to name it
-  const snap = s.messages.filter(m => m.role === 'user' || m.role === 'ai' || m.role === 'assistant');
-  if(snap.filter(m => m.role === 'user').length < 1) return;
+  const userMsgCount = s.messages.filter(m => m.role === 'user').length;
+  if(userMsgCount !== 6) return;
   try{
+    const payload = s.messages
+      .map(m => ({ role: m.role === 'user' ? 'user' : 'assistant', content: m.text || '' }))
+      .filter(m => m.content);
     const res = await fetch(`${API}/api/name-chat`,{
       method:'POST', headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({ messages: snap.slice(0,6).map(m=>({
-        role: m.role === 'user' ? 'user' : 'assistant',
-        content: m.text || ''
-      })).filter(m => m.content) })
+      body:JSON.stringify({ messages: payload })
     });
     const data = await res.json();
     const name = (data.name || '').trim();
