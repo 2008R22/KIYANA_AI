@@ -358,13 +358,6 @@ header {
     <h3>Settings</h3>
     <div class="setting-row">
       <div>
-        <div class="setting-label">Speak Replies</div>
-        <div class="setting-sub" id="speakSub">Kiyana reads her replies aloud</div>
-      </div>
-      <button class="toggle" id="speakToggle"></button>
-    </div>
-    <div class="setting-row">
-      <div>
         <div class="setting-label">Shake to Lock</div>
         <div class="setting-sub" id="lockSub">Shake phone to lock with PIN</div>
       </div>
@@ -444,6 +437,7 @@ function createNewSession(){
   sessions.unshift(s);
   saveSessions();
   currentId = id;
+  localStorage.setItem(ACTIVE_ID_KEY, String(id));
   messages  = [];
   viewport.innerHTML = '';
   renderMsg('ai', buildContextualGreeting());
@@ -451,18 +445,27 @@ function createNewSession(){
   renderSidebar();
 }
 
-/* Only auto-name once, on the very first user→AI exchange */
+/* Auto-name: fires after every AI reply until a real name sticks */
 async function autoNameSession(id){
   const s = getSession(id);
   if(!s || s.name !== 'New Chat') return;
-  if(messages.filter(m => m.role === 'user').length !== 1) return;
+  // Need at least one user message and one AI reply to name it
+  const snap = s.messages.filter(m => m.role === 'user' || m.role === 'ai' || m.role === 'assistant');
+  if(snap.filter(m => m.role === 'user').length < 1) return;
   try{
     const res = await fetch(`${API}/api/name-chat`,{
       method:'POST', headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({ messages: messages.slice(0,4).map(m=>({role:m.role,content:m.text})) })
+      body:JSON.stringify({ messages: snap.slice(0,6).map(m=>({
+        role: m.role === 'user' ? 'user' : 'assistant',
+        content: m.text || ''
+      })).filter(m => m.content) })
     });
     const data = await res.json();
-    if(data.name && s){ s.name = data.name; saveSessions(); renderSidebar(); }
+    const name = (data.name || '').trim();
+    if(name && name !== 'New Chat' && name !== 'Chat'){
+      const fresh = getSession(id);
+      if(fresh){ fresh.name = name; saveSessions(); renderSidebar(); }
+    }
   }catch(e){}
 }
 
@@ -472,6 +475,7 @@ function loadSession(id) {
   const s = getSession(id);
   if (!s) return;
   currentId = id;
+  localStorage.setItem(ACTIVE_ID_KEY, String(id));
   messages  = JSON.parse(JSON.stringify(s.messages));
   viewport.innerHTML = '';
   messages.forEach(m => renderMsg(m.role, m.text, m.imageUrl, m.isUserImg));
@@ -535,9 +539,8 @@ document.getElementById('newChatBtn').onclick    = () => { createNewSession(); c
 function buildContextualGreeting() {
   const hour = new Date().getHours();
   const lastOpen  = parseInt(localStorage.getItem(LASTOPEN_KEY) || '0');
-  const gapHours  = (Date.now() - lastOpen) / 3600000;
+  const gapHours  = lastOpen ? (Date.now() - lastOpen) / 3600000 : 999;
   const gapDays   = gapHours / 24;
-  localStorage.setItem(LASTOPEN_KEY, Date.now().toString());
   const tg = hour<5?"It's pretty late…":hour<12?"Good morning!":hour<17?"Hey, good afternoon.":hour<21?"Good evening!":"Up late tonight?";
   if (!lastOpen) return "Hey! I'm Kiyana. Nice to meet you 😊";
   if (gapDays>=7)  return `${tg} It's been over a week — I missed you.`;
@@ -715,7 +718,7 @@ async function onSend(){
   requestAnimationFrame(() => { msgInput.style.height='auto'; });
   pendingBase64=null; imgPreview.style.display='none';
   const reply=await sendChat(text,b64);
-  if(reply){ addMsg('ai', reply); speakText(reply); }
+  if(reply){ addMsg('ai', reply); }
 }
 
 async function onGenerate(){
@@ -740,7 +743,7 @@ async function onGenerate(){
    If "Speak Replies" is on, every AI reply is spoken via TTS.
 ═══════════════════════════════════════════════════════════════════════════ */
 
-/* ── Shared audio context (one per page) ── */
+/* ── Shared audio context (one per page, used by mic input) ── */
 let audioCtx = null;
 function ensureAudioCtx(){
   if(!audioCtx) audioCtx = new (window.AudioContext||window.webkitAudioContext)();
@@ -750,69 +753,6 @@ async function resumeAudioCtx(){
   const ctx = ensureAudioCtx();
   if(ctx.state==='suspended') await ctx.resume();
   return ctx;
-}
-
-/* ── Speak Replies setting ── */
-const SPEAK_KEY = 'kiyana_speak_replies';
-let speakReplies = localStorage.getItem(SPEAK_KEY) === 'true';
-let currentSource = null;
-
-function updateSpeakUI(){
-  document.getElementById('speakToggle').classList.toggle('on', speakReplies);
-}
-updateSpeakUI();
-
-document.getElementById('speakToggle').onclick = () => {
-  speakReplies = !speakReplies;
-  localStorage.setItem(SPEAK_KEY, speakReplies);
-  updateSpeakUI();
-  if(!speakReplies) stopCurrentAudio();
-};
-
-function stopCurrentAudio(){
-  if(currentSource){
-    try{ currentSource.stop(); }catch(e){}
-    try{ currentSource.disconnect(); }catch(e){}
-    currentSource = null;
-  }
-}
-
-async function speakText(text){
-  if(!speakReplies) return;
-  stopCurrentAudio();
-  try{
-    const res = await fetch(`${API}/api/tts`,{
-      method:'POST', headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({text})
-    });
-    if(!res.ok) return;
-    const arrayBuf = await res.arrayBuffer();
-    if(!arrayBuf || arrayBuf.byteLength < 100) return;
-    if(!speakReplies) return;
-    try{
-      const ctx = await resumeAudioCtx();
-      const audioBuffer = await ctx.decodeAudioData(arrayBuf.slice(0));
-      stopCurrentAudio();
-      if(!speakReplies) return;
-      await new Promise(resolve => {
-        const source = ctx.createBufferSource();
-        source.buffer = audioBuffer;
-        source.connect(ctx.destination);
-        currentSource = source;
-        source.onended = () => { source.disconnect(); if(currentSource===source) currentSource=null; resolve(); };
-        source.start(0);
-      });
-    }catch(decodeErr){
-      const blob = new Blob([arrayBuf],{type:'audio/mpeg'});
-      const url  = URL.createObjectURL(blob);
-      await new Promise((resolve)=>{
-        const audio = new Audio(url);
-        audio.onended = ()=>{ URL.revokeObjectURL(url); resolve(); };
-        audio.onerror = ()=>{ URL.revokeObjectURL(url); resolve(); };
-        audio.play().catch(()=>{ URL.revokeObjectURL(url); resolve(); });
-      });
-    }
-  }catch(e){}
 }
 
 /* ── Voice input state ── */
@@ -951,21 +891,32 @@ msgInput.oninput=function(){
 };
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   BOOT — restore last session or create new
+   BOOT — restore last session or create new one
+   If the user was away for 10+ minutes, always start a fresh chat so they
+   get a contextual greeting instead of landing mid-conversation.
 ═══════════════════════════════════════════════════════════════════════════ */
 (function boot(){
-  if(sessions.length){
-    const s=sessions[0];
-    currentId=s.id;
-    messages=JSON.parse(JSON.stringify(s.messages));
+  const lastOpen  = parseInt(localStorage.getItem(LASTOPEN_KEY) || '0');
+  const gapMins   = lastOpen ? (Date.now() - lastOpen) / 60000 : Infinity;
+  localStorage.setItem(LASTOPEN_KEY, Date.now().toString());
+
+  const startFresh = gapMins >= 10 || !sessions.length;
+
+  if(!startFresh && sessions.length){
+    // Restore active session (prefer the one that was last active)
+    const savedId = parseInt(localStorage.getItem(ACTIVE_ID_KEY) || '0');
+    const target  = (savedId && getSession(savedId)) ? getSession(savedId) : sessions[0];
+    currentId = target.id;
+    messages  = JSON.parse(JSON.stringify(target.messages));
     if(messages.length){
-      messages.forEach(m=>renderMsg(m.role,m.text,m.imageUrl,m.isUserImg));
-      viewport.scrollTop=viewport.scrollHeight;
+      messages.forEach(m => renderMsg(m.role, m.text, m.imageUrl, m.isUserImg));
+      viewport.scrollTop = viewport.scrollHeight;
     } else {
-      renderMsg('ai',buildContextualGreeting());
+      renderMsg('ai', buildContextualGreeting());
       persistCurrentMessages();
     }
   } else {
+    // New session — fresh start after being away or first ever launch
     createNewSession();
   }
   renderSidebar();
