@@ -1214,16 +1214,27 @@ async function processAudio(){
     callTranscript.textContent='🗣 '+transcript;
     callHistory.push({role:'user', content:transcript});
 
-    // ── Chat ──
+       // ── Chat ──
     setStatus('Thinking…', 'thinking');
-    const chatRes = await fetch(`${API}/api/chat`,{
-      method:'POST', headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({message:transcript, history:callHistory.slice(-12)})
-    });
-    const chatData = await chatRes.json();
-    // Strip markdown symbols that sound weird in TTS
-    const reply = (chatData.content||'Sorry, something went wrong.')
-      .replace(/[*_~`#>]/g,'').trim();
+    let reply = "I had a little hiccup — say that again?";
+    try{
+      const chatRes = await fetch(`${API}/api/chat`,{
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({message:transcript, history:callHistory.slice(-12)})
+      });
+      if(chatRes.ok){
+        const chatData = await chatRes.json();
+        if(chatData.content){
+          // Strip markdown symbols that sound weird in TTS
+          reply = chatData.content.replace(/[*_~`#>]/g,'').trim();
+        }
+      } else {
+        console.error('Chat API error:', chatRes.status);
+      }
+    }catch(chatErr){
+      console.error('Chat fetch error:', chatErr.message);
+    }
+
     callHistory.push({role:'assistant', content:reply});
     callTranscript.textContent='💬 '+reply;
 
@@ -1235,32 +1246,12 @@ async function processAudio(){
     try{
       await speakReply(reply);
     }catch(ttsErr){
-      // TTS failed — don't crash the call, just show the text and continue
       console.error('TTS failed:', ttsErr.message);
       callTranscript.textContent='💬 ' + reply;
       await new Promise(r=>setTimeout(r,2500));
     }
 
     avatarRing.classList.remove('pulse');
-
-  }catch(err){
-    console.error('processAudio error', err);
-    callTranscript.textContent='⚠️ Something went wrong.';
-    setStatus('Error', 'error');
-    await new Promise(r=>setTimeout(r,1500));
-  }finally{
-    isProcessing=false;
-    if(callActive) resumeListening();
-  }
-}
-
-function resumeListening(){
-  if(!callActive) return;
-  callWave.className='call-wave user-speaking';
-  setStatus('Listening…', 'listening');
-  callTranscript.textContent="Go ahead…";
-  isSpeaking=false; speechStarted=false;
-}
 
 /* ── TTS playback ──
    Tries AudioContext.decodeAudioData first (best for Capacitor/Android,
