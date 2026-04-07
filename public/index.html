@@ -1188,6 +1188,16 @@ async function processAudio(){
       headers:{'Content-Type':mimeType},
       body:audioBlob
     });
+    if(!sttRes.ok){
+      const errText = await sttRes.text().catch(()=>'Unknown STT error');
+      console.error('STT error:', sttRes.status, errText);
+      callTranscript.textContent = "Couldn't process audio — try again.";
+      setStatus('Error', 'error');
+      await new Promise(r=>setTimeout(r,1500));
+      isProcessing=false;
+      if(callActive) resumeListening();
+      return;
+    }
     const sttData    = await sttRes.json();
     const transcript = (sttData.transcript||'').trim();
 
