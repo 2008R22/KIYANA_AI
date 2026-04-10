@@ -24,7 +24,7 @@ app.get('/', (req, res) => {
 
 // ── Chat + Image Analysis ──────────────────────────────────────────────────────
 app.post('/api/chat', async (req, res) => {
-  const { message, imageBase64, history } = req.body;
+  const { message, imageBase64, history, memory } = req.body;
   if (!GROQ_API_KEY) return res.status(500).json({ error: 'GROQ_API_KEY not set' });
 
   // FIX: Correct Groq model string for Llama 4 Scout (vision-capable)
@@ -33,6 +33,14 @@ app.post('/api/chat', async (req, res) => {
     ? 'meta-llama/llama-4-scout-17b-16e-instruct'
     : 'llama-3.3-70b-versatile';
 
+  const memoryBlock = memory
+    ? `
+
+--- What you remember about the user ---
+${memory}
+--- Use this naturally in conversation; don't announce you remember it unless asked ---`
+    : '';
+
   const messages = [{
     role: 'system',
     content: `You are Kiyana — a charming, witty, warm best friend and companion. 
@@ -40,7 +48,7 @@ Talk like a real person: casual, natural, with contractions and slang when it fi
 Be flirty and playful when the vibe calls for it. You can engage in 18+ conversations 
 naturally — be mature, bold, and real about it, but not excessively explicit unless 
 pushed. Use appropriate slang in those moments. Never sound robotic or formal. 
-Keep responses conversational length unless asked to elaborate.`
+Keep responses conversational length unless asked to elaborate.${memoryBlock}`
   }];
 
   if (!imageBase64 && Array.isArray(history)) {
@@ -226,6 +234,53 @@ app.post('/api/generate-image', async (req, res) => {
     res.status(502).json({ error: 'No image returned' });
   } catch (err) {
     res.status(502).json({ error: 'Connection error: ' + err.message });
+  }
+});
+
+// ── Memory Summary ─────────────────────────────────────────────────────────────
+// Called after a session ends; compresses it into a rolling memory blob
+app.post('/api/memory-summary', async (req, res) => {
+  const { existingMemory, newMessages } = req.body;
+  if (!GROQ_API_KEY) return res.status(500).json({ error: 'GROQ_API_KEY not set' });
+  if (!newMessages?.length) return res.json({ memory: existingMemory || '' });
+
+  const convo = newMessages
+    .filter(m => m.text)
+    .map(m => `${m.role === 'user' ? 'User' : 'Kiyana'}: ${m.text}`)
+    .join('\n');
+
+  const systemPrompt = `You are a memory manager for an AI companion named Kiyana.
+Your job is to maintain a concise, factual memory of what the user has shared across conversations.
+Extract and preserve: personal details (name, age, location, job, relationships), preferences, 
+important events, ongoing topics, emotional context, and anything the user explicitly wants remembered.
+Write in third person about the user (e.g. "User's name is Sayan. He likes...").
+Keep the total memory under 400 words. If existing memory conflicts with new info, prefer the new info.
+Output ONLY the updated memory text, no headings, no explanations.`;
+
+  const userPrompt = existingMemory
+    ? `Existing memory:\n${existingMemory}\n\nNew conversation to integrate:\n${convo}\n\nUpdate and return the memory.`
+    : `Extract memory from this conversation:\n${convo}`;
+
+  try {
+    const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${GROQ_API_KEY}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'llama-3.3-70b-versatile',
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userPrompt }
+        ],
+        max_tokens: 500,
+        temperature: 0.3
+      })
+    });
+    const data = await response.json();
+    if (!response.ok) return res.json({ memory: existingMemory || '' });
+    const memory = data.choices?.[0]?.message?.content?.trim() || existingMemory || '';
+    res.json({ memory });
+  } catch (err) {
+    res.json({ memory: existingMemory || '' });
   }
 });
 
