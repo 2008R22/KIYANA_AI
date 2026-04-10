@@ -460,12 +460,21 @@ async function autoNameSession(){
   const userMessages = messages.filter(m => m.role === 'user');
   if(userMessages.length !== 1) return;
   
+  // Fallback: use first user message words if API fails
+  const fallbackName = () => {
+    const firstUser = userMessages[0]?.text || '';
+    const words = firstUser.trim().split(/\s+/).slice(0, 5).join(' ');
+    return words || 'Chat';
+  };
+
   try{
-    // Format messages correctly for the API
-    const formattedMessages = messages.map(m => ({
-      role: m.role,
-      content: m.text || ''
-    }));
+    // Map 'ai' → 'assistant' so the API receives valid role values
+    const formattedMessages = messages
+      .filter(m => m.text)
+      .map(m => ({
+        role: m.role === 'user' ? 'user' : 'assistant',
+        content: m.text || ''
+      }));
     
     const res = await fetch(`${API}/api/name-chat`,{
       method:'POST', 
@@ -473,14 +482,22 @@ async function autoNameSession(){
       body:JSON.stringify({ messages: formattedMessages })
     });
     
+    if(!res.ok) throw new Error('API error');
     const data = await res.json();
-    if(data.name && data.name !== 'Chat' && s){ 
-      s.name = data.name; 
+    const name = data.name && data.name !== 'Chat' ? data.name : fallbackName();
+    if(s){ 
+      s.name = name; 
       saveSessions(); 
       renderSidebar(); 
     }
   }catch(e){
-    console.log('Auto-name failed:', e);
+    // Fallback to first user message words
+    if(s && s.name === 'New Chat'){
+      s.name = fallbackName();
+      saveSessions();
+      renderSidebar();
+    }
+    console.log('Auto-name failed, used fallback:', e);
   }
 }
 
