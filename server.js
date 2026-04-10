@@ -84,23 +84,46 @@ app.post('/api/name-chat', async (req, res) => {
   if (!messages || !messages.length) return res.json({ name: 'New Chat' });
 
   try {
+    // Get the first user message for context
+    const userMessages = messages.filter(m => m.role === 'user');
+    const firstUserMessage = userMessages[0]?.content || '';
+    
     const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
       headers: { 'Authorization': `Bearer ${GROQ_API_KEY}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({
         model: 'llama-3.3-70b-versatile',
         messages: [
-          { role: 'system', content: 'You generate very short chat titles (3-5 words max). Respond with ONLY the title, no quotes, no punctuation, nothing else.' },
-          { role: 'user', content: `Give a short title for this conversation:\n${messages.slice(0,4).map(m=>`${m.role}: ${m.content}`).join('\n')}` }
+          { 
+            role: 'system', 
+            content: 'Generate a very short, catchy chat title (2-4 words max). Respond with ONLY the title, no quotes, no punctuation, no explanations. Make it descriptive of what the user asked about.' 
+          },
+          { 
+            role: 'user', 
+            content: `Create a short title for a conversation that starts with this message: "${firstUserMessage}"` 
+          }
         ],
-        max_tokens: 20
+        max_tokens: 15,
+        temperature: 0.7
       })
     });
+    
     const data = await response.json();
-    const name = data.choices?.[0]?.message?.content?.trim() || 'Chat';
+    let name = data.choices?.[0]?.message?.content?.trim() || 'New Chat';
+    
+    // Clean up the name - remove any quotes or extra punctuation
+    name = name.replace(/^["']|["']$/g, '').replace(/[.!?]$/, '');
+    
+    // If name is too long, truncate it
+    if (name.length > 30) name = name.substring(0, 30);
+    
+    // If name is still empty or just "Chat", use default
+    if (!name || name.toLowerCase() === 'chat') name = 'New Chat';
+    
     res.json({ name });
   } catch (err) {
-    res.json({ name: 'Chat' });
+    console.error('Name generation error:', err);
+    res.json({ name: 'New Chat' });
   }
 });
 
