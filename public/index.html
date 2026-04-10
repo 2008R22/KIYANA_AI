@@ -1,4 +1,4 @@
-5<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -21,9 +21,7 @@ body {
 ::-webkit-scrollbar { width:4px; }
 ::-webkit-scrollbar-thumb { background:#2a2a2a; border-radius:2px; }
 
-/* ═══════════════════════════════════════════════════════
-   SIDEBAR
-═══════════════════════════════════════════════════════ */
+/* ═══ SIDEBAR ═══════════════════════════════════════════════════════════════ */
 #sidebar {
   width:var(--sidebar-w); height:100vh; height:100dvh;
   background:var(--surface); border-right:1px solid var(--surface2);
@@ -90,13 +88,10 @@ body {
 }
 #sidebarMask.show { display:block; }
 
-/* ═══════════════════════════════════════════════════════
-   MAIN LAYOUT
-═══════════════════════════════════════════════════════ */
+/* ═══ MAIN LAYOUT ════════════════════════════════════════════════════════════ */
 #main {
   flex:1; display:flex; flex-direction:column;
   height:100vh; height:100dvh; overflow:hidden;
-  transition:margin-left .28s cubic-bezier(.4,0,.2,1);
 }
 
 header {
@@ -108,7 +103,6 @@ header {
   flex-shrink:0; position:relative; z-index:10;
 }
 .header-left { display:flex; align-items:center; gap:12px; }
-.brand { font-family:'Syne',sans-serif; font-weight:800; font-size:1.3rem; letter-spacing:.12em; }
 .header-right { display:flex; gap:8px; }
 
 .icon-btn {
@@ -126,7 +120,7 @@ header {
   padding-bottom:16px; scroll-behavior:smooth;
 }
 
-/* ── Messages ─────────────────────────────────────────── */
+/* ── Messages ─────────────────────────────────────────────────────────────── */
 .msg { max-width:82%; animation:fadeUp .3s ease-out forwards; }
 .msg.user { align-self:flex-end; }
 .msg.ai   { align-self:flex-start; }
@@ -159,7 +153,7 @@ header {
 .dot:nth-child(2){animation-delay:.2s} .dot:nth-child(3){animation-delay:.4s}
 @keyframes pulse{0%,100%{opacity:.3}50%{opacity:1}}
 
-/* ── Input ────────────────────────────────────────────── */
+/* ── Input ────────────────────────────────────────────────────────────────── */
 .input-section {
   padding:10px 14px 18px;
   padding-bottom:max(18px, calc(env(safe-area-inset-bottom) + 10px));
@@ -196,9 +190,78 @@ header {
 .img-preview span { font-size:.83rem; color:var(--dim); }
 .img-preview button { margin-left:auto; background:none; border:none; color:var(--dim); cursor:pointer; font-size:1.2rem; }
 
-/* ═══════════════════════════════════════════════════════
-   MODALS / OVERLAYS
-═══════════════════════════════════════════════════════ */
+/* ═══ CALL MODE OVERLAY ══════════════════════════════════════════════════════ */
+#callOverlay {
+  position:fixed; inset:0; z-index:1000;
+  background:radial-gradient(ellipse at 50% 40%, #1a0d2e 0%, #000 70%);
+  display:none; flex-direction:column;
+  align-items:center; justify-content:center; gap:28px;
+}
+#callOverlay.show { display:flex; }
+
+.call-avatar {
+  width:120px; height:120px; border-radius:50%;
+  background:linear-gradient(135deg,#3a1a6e,#1a0d2e);
+  border:3px solid rgba(255,255,255,.12);
+  display:flex; align-items:center; justify-content:center;
+  font-family:'Syne',sans-serif; font-size:2.8rem; font-weight:800;
+  color:rgba(255,255,255,.6);
+  position:relative;
+}
+.call-avatar::after {
+  content:'';
+  position:absolute; inset:-12px; border-radius:50%;
+  border:2px solid rgba(255,255,255,.06);
+}
+.call-avatar.speaking {
+  animation:avatarPulse 1s ease-in-out infinite;
+  border-color:rgba(255,255,255,.3);
+}
+.call-avatar.listening {
+  animation:avatarListen 1.2s ease-in-out infinite;
+  border-color:rgba(120,80,255,.6);
+}
+@keyframes avatarPulse {
+  0%,100% { box-shadow:0 0 0 0 rgba(255,255,255,.1); }
+  50%      { box-shadow:0 0 0 20px rgba(255,255,255,.0); }
+}
+@keyframes avatarListen {
+  0%,100% { box-shadow:0 0 0 0 rgba(120,80,255,.3); }
+  50%      { box-shadow:0 0 0 24px rgba(120,80,255,.0); }
+}
+
+.call-name {
+  font-family:'Syne',sans-serif; font-weight:800;
+  font-size:1.6rem; letter-spacing:.1em; color:#fff;
+}
+.call-status {
+  font-size:.88rem; color:rgba(255,255,255,.4);
+  letter-spacing:.05em; min-height:20px; text-align:center;
+}
+.call-transcript {
+  max-width:300px; text-align:center;
+  font-size:.92rem; color:rgba(255,255,255,.65);
+  line-height:1.6; min-height:48px; padding:0 20px;
+  transition:opacity .3s;
+}
+
+.call-controls {
+  display:flex; gap:24px; margin-top:8px;
+}
+.call-btn {
+  width:64px; height:64px; border-radius:50%; border:none;
+  display:flex; align-items:center; justify-content:center;
+  cursor:pointer; transition:.18s;
+}
+.call-btn:active { transform:scale(.92); }
+.call-btn svg { width:24px; height:24px; }
+.call-btn.mute   { background:var(--surface2); color:var(--text); }
+.call-btn.mute.active { background:#ff3b30; color:#fff; }
+.call-btn.end    { background:#ff3b30; color:#fff; }
+.call-btn.speaker { background:var(--surface2); color:var(--text); }
+.call-btn.speaker.active { background:#4cd964; color:#000; }
+
+/* ═══ MODALS / OVERLAYS ══════════════════════════════════════════════════════ */
 .overlay {
   position:fixed; inset:0; background:rgba(0,0,0,.88);
   display:none; align-items:center; justify-content:center;
@@ -231,9 +294,7 @@ header {
 .toggle::after { content:''; position:absolute; width:20px; height:20px; border-radius:50%; background:#000; top:3px; left:3px; transition:.2s; }
 .toggle.on::after { left:21px; }
 
-/* ═══════════════════════════════════════════════════════
-   LOCK SCREEN
-═══════════════════════════════════════════════════════ */
+/* ═══ LOCK SCREEN ════════════════════════════════════════════════════════════ */
 #lockScreen {
   position:fixed; inset:0; z-index:9999; background:#000;
   display:none; flex-direction:column;
@@ -267,6 +328,19 @@ header {
   animation:micPulse 1s ease-in-out infinite;
 }
 @keyframes micPulse { 0%,100%{opacity:1} 50%{opacity:.6} }
+
+/* ── Call button in header ── */
+.icon-btn.call-active { background:#4cd964; color:#000; }
+
+/* ── Header chat title ── */
+.header-title-block { display:flex; flex-direction:column; }
+.brand { font-family:'Syne',sans-serif; font-weight:800; font-size:1.3rem; letter-spacing:.12em; line-height:1.1; }
+.header-chat-name {
+  font-size:.72rem; color:var(--dim); letter-spacing:.03em;
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+  max-width:160px; margin-top:1px;
+  transition:opacity .3s;
+}
 </style>
 </head>
 <body>
@@ -287,16 +361,22 @@ header {
   <div class="sidebar-sessions" id="sidebarSessions"></div>
 </div>
 
-<!-- ══ MAIN ═════════════════════════════════════════════════════════════════ -->
+<!-- ══ MAIN ══════════════════════════════════════════════════════════════════ -->
 <div id="main">
   <header>
     <div class="header-left">
       <button class="icon-btn" id="sidebarToggle" title="Chats">
         <svg fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" viewBox="0 0 24 24"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
       </button>
-      <div class="brand">KIYANA</div>
+      <div class="header-title-block">
+        <div class="brand">KIYANA</div>
+        <div class="header-chat-name" id="headerChatName"></div>
+      </div>
     </div>
     <div class="header-right">
+      <button class="icon-btn" id="callBtn" title="Voice Call">
+        <svg fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12 19.79 19.79 0 0 1 1.61 3.4 2 2 0 0 1 3.6 1.22h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 8.78a16 16 0 0 0 6.29 6.29l1.62-1.62a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+      </button>
       <button class="icon-btn" id="settingsBtn" title="Settings">
         <svg fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
       </button>
@@ -338,7 +418,26 @@ header {
 <input type="file" id="fileInput" accept="image/*" style="display:none">
 <div class="shake-hint" id="shakeHint">Shake to lock</div>
 
-<!-- ══ LOCK SCREEN ═══════════════════════════════════════════════════════════ -->
+<!-- ══ CALL OVERLAY ══════════════════════════════════════════════════════════ -->
+<div id="callOverlay">
+  <div class="call-avatar" id="callAvatar">K</div>
+  <div class="call-name">Kiyana</div>
+  <div class="call-status" id="callStatus">Connecting…</div>
+  <div class="call-transcript" id="callTranscript"></div>
+  <div class="call-controls">
+    <button class="call-btn mute" id="callMuteBtn" title="Mute">
+      <svg fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+    </button>
+    <button class="call-btn end" id="callEndBtn" title="End Call">
+      <svg fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M10.68 13.31a16 16 0 0 0 3.41 2.6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 2 2 0 0 1-.29-.22M2 2l20 20"/><path d="M3.55 3.55A19.5 19.5 0 0 0 3 6.6a19.79 19.79 0 0 0 3.07 8.63 2 2 0 0 0 .22.29"/></svg>
+    </button>
+    <button class="call-btn speaker" id="callSpeakerBtn" title="Speaker">
+      <svg fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>
+    </button>
+  </div>
+</div>
+
+<!-- ══ LOCK SCREEN ══════════════════════════════════════════════════════════ -->
 <div id="lockScreen">
   <div class="lock-icon">
     <svg fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
@@ -377,7 +476,7 @@ header {
   </div>
 </div>
 
-<!-- ══ PIN SETUP ═════════════════════════════════════════════════════════════ -->
+<!-- ══ PIN SETUP ══════════════════════════════════════════════════════════════ -->
 <div class="overlay" id="pinSetupOverlay">
   <div class="modal" style="text-align:center">
     <h3>Set a PIN</h3>
@@ -403,10 +502,8 @@ const IMG_KEY       = 'kiyana_imgs';
 const PIN_KEY       = 'kiyana_pin';
 const LOCK_KEY      = 'kiyana_lock_enabled';
 const LASTOPEN_KEY  = 'kiyana_last_open';
-const ACTIVE_ID_KEY = 'kiyana_active_id';
-const MEMORY_KEY    = 'kiyana_memory';
+const SPEAK_KEY     = 'kiyana_speak_replies';
 
-// FIX: image history capped at 5 to prevent localStorage overflow (~1MB max)
 const MAX_IMG_HISTORY = 5;
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -417,7 +514,6 @@ let imgHistory   = JSON.parse(localStorage.getItem(IMG_KEY)      || '[]');
 let currentId    = null;
 let messages     = [];
 let pendingBase64= null;
-let globalMemory  = localStorage.getItem(MEMORY_KEY) || '';
 
 const viewport     = document.getElementById('viewport');
 const msgInput     = document.getElementById('msgInput');
@@ -430,8 +526,7 @@ const previewThumb = document.getElementById('previewThumb');
    SESSION HELPERS
 ═══════════════════════════════════════════════════════════════════════════ */
 function saveSessions(){ localStorage.setItem(SESSIONS_KEY, JSON.stringify(sessions)); }
-// FIX: only keep MAX_IMG_HISTORY images to avoid blowing up localStorage
-function saveImgs() { localStorage.setItem(IMG_KEY, JSON.stringify(imgHistory.slice(0, MAX_IMG_HISTORY))); }
+function saveImgs()    { localStorage.setItem(IMG_KEY, JSON.stringify(imgHistory.slice(0, MAX_IMG_HISTORY))); }
 function getSession(id){ return sessions.find(s => s.id === id); }
 
 function persistCurrentMessages(){
@@ -441,9 +536,8 @@ function persistCurrentMessages(){
 }
 
 function createNewSession(){
-  if(messages.length >= 2) updateMemory(messages);
   const id  = Date.now();
-  const s   = { id, name:'New Chat', ts:id, messages:[] };
+  const s   = { id, name:'New Chat', ts:id, messages:[], named:false };
   sessions.unshift(s);
   saveSessions();
   currentId = id;
@@ -452,105 +546,95 @@ function createNewSession(){
   renderMsg('ai', buildContextualGreeting());
   persistCurrentMessages();
   renderSidebar();
+  updateHeaderChatName();
 }
 
-/* Only auto-name once, on the very first user→AI exchange */
+/* Auto-name fires once: after the first AI reply in a session */
 async function autoNameSession(){
   const s = getSession(currentId);
-  if(!s || s.name !== 'New Chat') return;
+  if(!s || s.named) return;
 
-  // Only trigger on the first real exchange (exactly 1 user message so far)
-  const userMessages = messages.filter(m => m.role === 'user');
-  if(userMessages.length !== 1) return;
+  const userMsgs = messages.filter(m => m.role === 'user');
+  if(userMsgs.length < 1) return;
 
-  // Apply fallback name immediately so sidebar always updates fast
-  const firstUserText = userMessages[0]?.text || '';
-  const fallbackName  = firstUserText.trim().split(/\s+/).slice(0, 5).join(' ') || 'Chat';
-  s.name = fallbackName;
+  s.named = true; /* mark immediately to avoid duplicate calls */
   saveSessions();
-  renderSidebar();
 
-  // Then try to get a smarter AI-generated name
   try{
-    const formattedMessages = messages
-      .filter(m => m.text)
-      .map(m => ({ role: m.role === 'user' ? 'user' : 'assistant', content: m.text || '' }));
+    const formatted = messages.map(m => ({
+      role: m.role === 'user' ? 'user' : 'assistant',
+      content: typeof m.text === 'string' ? m.text : ''
+    })).filter(m => m.content);
 
-    const res = await fetch(`${API}/api/name-chat`,{
+    const res = await fetch(`${API}/api/name-chat`, {
       method:'POST',
       headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({ messages: formattedMessages })
+      body:JSON.stringify({ messages: formatted })
     });
-
-    if(!res.ok) return; // keep fallback
     const data = await res.json();
-    const aiName = (data.name || '').trim();
-    // Only upgrade if we got something meaningful back
-    if(aiName && aiName.toLowerCase() !== 'chat' && aiName.toLowerCase() !== 'new chat'){
-      const fresh = getSession(currentId);
-      if(fresh){ fresh.name = aiName; saveSessions(); renderSidebar(); }
+    if(data.name && data.name !== 'New Chat' && data.name !== 'Chat'){
+      s.name = data.name;
+      saveSessions();
+      renderSidebar();
+      updateHeaderChatName();
     }
   }catch(e){
-    console.log('Auto-name AI call failed, using fallback:', e);
+    /* silently ignore – session keeps its name */
   }
 }
 
-function loadSession(id) {
-  if (id === currentId) { closeSidebar(); return; }
+function loadSession(id){
+  if(id === currentId){ closeSidebar(); return; }
   persistCurrentMessages();
-  if(messages.length >= 2) updateMemory(messages);
   const s = getSession(id);
-  if (!s) return;
+  if(!s) return;
   currentId = id;
   messages  = JSON.parse(JSON.stringify(s.messages));
   viewport.innerHTML = '';
   messages.forEach(m => renderMsg(m.role, m.text, m.imageUrl, m.isUserImg));
   viewport.scrollTop = viewport.scrollHeight;
   renderSidebar();
+  updateHeaderChatName();
   closeSidebar();
 }
 
-function deleteSession(e, id) {
+function deleteSession(e, id){
   e.stopPropagation();
   sessions = sessions.filter(s => s.id !== id);
   saveSessions();
-  if (id === currentId) {
-    if (sessions.length) {
-      loadSession(sessions[0].id);
-    } else {
-      currentId = null; messages = [];
-      viewport.innerHTML = '';
-      createNewSession();
-    }
+  if(id === currentId){
+    if(sessions.length){ loadSession(sessions[0].id); }
+    else { currentId=null; messages=[]; viewport.innerHTML=''; createNewSession(); }
   } else {
     renderSidebar();
   }
 }
 
-function renameSession(e, id) {
+function renameSession(e, id){
   e.stopPropagation();
   const s = getSession(id);
-  if (!s) return;
-  
-  const newName = prompt('Enter new chat name:', s.name);
-  if (newName && newName.trim()) {
-    s.name = newName.trim();
+  if(!s) return;
+  const newName = prompt('Rename chat:', s.name);
+  if(newName && newName.trim()){
+    s.name   = newName.trim();
+    s.named  = true;
     saveSessions();
     renderSidebar();
+    updateHeaderChatName();
   }
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
    SIDEBAR RENDER
 ═══════════════════════════════════════════════════════════════════════════ */
-function renderSidebar() {
+function renderSidebar(){
   const el = document.getElementById('sidebarSessions');
-  if (!sessions.length) {
+  if(!sessions.length){
     el.innerHTML = '<div class="sidebar-empty">No chats yet</div>';
     return;
   }
   el.innerHTML = sessions.map(s => `
-    <div class="session-item${s.id === currentId ? ' active' : ''}" onclick="loadSession(${s.id})" ondblclick="renameSession(event, ${s.id})">
+    <div class="session-item${s.id === currentId ? ' active' : ''}" onclick="loadSession(${s.id})" ondblclick="renameSession(event,${s.id})">
       <div class="session-name">${escHtml(s.name)}</div>
       <div class="session-meta">${formatDate(s.ts)}</div>
       <button class="session-del" onclick="deleteSession(event,${s.id})">×</button>
@@ -558,54 +642,56 @@ function renderSidebar() {
   `).join('');
 }
 
-function openSidebar()  {
-  document.getElementById('sidebar').classList.add('open');
-  document.getElementById('sidebarMask').classList.add('show');
+function updateHeaderChatName(){
+  const el = document.getElementById('headerChatName');
+  if(!el) return;
+  const s = getSession(currentId);
+  el.textContent = (s && s.name && s.name !== 'New Chat') ? s.name : '';
 }
-function closeSidebar() {
-  document.getElementById('sidebar').classList.remove('open');
-  document.getElementById('sidebarMask').classList.remove('show');
-}
+
+function openSidebar()  { document.getElementById('sidebar').classList.add('open'); document.getElementById('sidebarMask').classList.add('show'); }
+function closeSidebar() { document.getElementById('sidebar').classList.remove('open'); document.getElementById('sidebarMask').classList.remove('show'); }
 
 document.getElementById('sidebarToggle').onclick = openSidebar;
 document.getElementById('sidebarClose').onclick  = closeSidebar;
 document.getElementById('sidebarMask').onclick   = closeSidebar;
-document.getElementById('newChatBtn').onclick    = () => { createNewSession(); closeSidebar(); };
+document.getElementById('newChatBtn').onclick    = ()=>{ createNewSession(); closeSidebar(); };
 
 /* ═══════════════════════════════════════════════════════════════════════════
    CONTEXTUAL GREETING
 ═══════════════════════════════════════════════════════════════════════════ */
-function buildContextualGreeting() {
-  const hour = new Date().getHours();
-  const lastOpen  = parseInt(localStorage.getItem(LASTOPEN_KEY) || '0');
-  const gapHours  = (Date.now() - lastOpen) / 3600000;
-  const gapDays   = gapHours / 24;
+function buildContextualGreeting(){
+  const hour     = new Date().getHours();
+  const lastOpen = parseInt(localStorage.getItem(LASTOPEN_KEY) || '0');
+  const gapHours = (Date.now() - lastOpen) / 3600000;
+  const gapDays  = gapHours / 24;
   localStorage.setItem(LASTOPEN_KEY, Date.now().toString());
   const tg = hour<5?"It's pretty late…":hour<12?"Good morning!":hour<17?"Hey, good afternoon.":hour<21?"Good evening!":"Up late tonight?";
-  if (!lastOpen) return "Hey! I'm Kiyana. Nice to meet you 😊";
-  if (gapDays>=7)  return `${tg} It's been over a week — I missed you.`;
-  if (gapDays>=2)  return `${tg} You've been gone ${Math.floor(gapDays)} days. Everything good?`;
-  if (gapHours>=20)return `${tg} Slept okay? What's on your mind?`;
-  if (gapHours>=6) return `${tg} Welcome back. What's up?`;
-  if (gapHours>=1) return "Hey, you're back. Miss me already?";
+  if(!lastOpen) return "Hey! I'm Kiyana. Nice to meet you 😊";
+  if(gapDays>=7)  return `${tg} It's been over a week — I missed you.`;
+  if(gapDays>=2)  return `${tg} You've been gone ${Math.floor(gapDays)} days. Everything good?`;
+  if(gapHours>=20)return `${tg} Slept okay? What's on your mind?`;
+  if(gapHours>=6) return `${tg} Welcome back. What's up?`;
+  if(gapHours>=1) return "Hey, you're back. Miss me already?";
   return ["Back so soon? I like it 😏","Forgot something?","Couldn't stay away, huh?","Already back — what's up?"][Math.floor(Math.random()*4)];
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
    SHAKE TO LOCK
 ═══════════════════════════════════════════════════════════════════════════ */
-let lockEnabled=localStorage.getItem(LOCK_KEY)==='true', storedPin=localStorage.getItem(PIN_KEY)||'';
-let isLocked=false,pinEntry='',setupEntry='',setupPhase=0,setupFirst='';
-let lastX=0,lastY=0,lastZ=0,shakeTs=0;
+let lockEnabled = localStorage.getItem(LOCK_KEY) === 'true';
+let storedPin   = localStorage.getItem(PIN_KEY)  || '';
+let isLocked = false, pinEntry = '', setupEntry = '', setupPhase = 0, setupFirst = '';
+let lastX = 0, lastY = 0, lastZ = 0, shakeTs = 0;
 
 function attachShakeListener(){
-  window.addEventListener('devicemotion',e=>{
-    if(!lockEnabled||isLocked) return;
-    const {x,y,z}=e.accelerationIncludingGravity||{};
-    if(x==null) return;
-    const delta=Math.abs(x-lastX)+Math.abs(y-lastY)+Math.abs(z-lastZ);
-    lastX=x;lastY=y;lastZ=z;
-    if(delta>18&&Date.now()-shakeTs>2000){shakeTs=Date.now();triggerLock();}
+  window.addEventListener('devicemotion', e => {
+    if(!lockEnabled || isLocked) return;
+    const {x,y,z} = e.accelerationIncludingGravity || {};
+    if(x == null) return;
+    const delta = Math.abs(x-lastX)+Math.abs(y-lastY)+Math.abs(z-lastZ);
+    lastX=x; lastY=y; lastZ=z;
+    if(delta > 18 && Date.now()-shakeTs > 2000){ shakeTs=Date.now(); triggerLock(); }
   });
 }
 
@@ -616,25 +702,26 @@ if(typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestP
   window._needsMotionPermission = false;
 }
 
-function showShakeHint(){const h=document.getElementById('shakeHint');h.classList.add('show');setTimeout(()=>h.classList.remove('show'),2500);}
-function triggerLock(){if(!storedPin)return;isLocked=true;pinEntry='';updatePinDots('pinDots',0);document.getElementById('pinError').textContent='';document.getElementById('lockScreen').classList.add('show');}
-function tryUnlock(d){pinEntry+=d;updatePinDots('pinDots',pinEntry.length);if(pinEntry.length===4){if(pinEntry===storedPin){isLocked=false;document.getElementById('lockScreen').classList.remove('show');pinEntry='';}else{document.getElementById('pinError').textContent='Wrong PIN';setTimeout(()=>{pinEntry='';updatePinDots('pinDots',0);document.getElementById('pinError').textContent='';},700);}}}
-function updatePinDots(cid,n){for(let i=0;i<4;i++)document.getElementById(cid==='pinDots'?`d${i}`:`sd${i}`).classList.toggle('filled',i<n);}
-function buildPinPad(pid,onD,onDel){const p=document.getElementById(pid);p.innerHTML='';[1,2,3,4,5,6,7,8,9,'',0,'⌫'].forEach(k=>{const b=document.createElement('button');b.className='pin-key'+(k==='⌫'?' del':'');b.textContent=k;if(k!=='')b.onclick=()=>k==='⌫'?onDel():onD(String(k));else b.style.background='transparent';p.appendChild(b);});}
-buildPinPad('pinPad',d=>tryUnlock(d),()=>{pinEntry=pinEntry.slice(0,-1);updatePinDots('pinDots',pinEntry.length);});
-buildPinPad('setupPad',d=>{
-  if(setupEntry.length>=4)return;
-  setupEntry+=d;updatePinDots('setupDots',setupEntry.length);
+function showShakeHint(){ const h=document.getElementById('shakeHint'); h.classList.add('show'); setTimeout(()=>h.classList.remove('show'),2500); }
+function triggerLock(){ if(!storedPin)return; isLocked=true; pinEntry=''; updatePinDots('pinDots',0); document.getElementById('pinError').textContent=''; document.getElementById('lockScreen').classList.add('show'); }
+function tryUnlock(d){ pinEntry+=d; updatePinDots('pinDots',pinEntry.length); if(pinEntry.length===4){ if(pinEntry===storedPin){ isLocked=false; document.getElementById('lockScreen').classList.remove('show'); pinEntry=''; } else { document.getElementById('pinError').textContent='Wrong PIN'; setTimeout(()=>{ pinEntry=''; updatePinDots('pinDots',0); document.getElementById('pinError').textContent=''; },700); } } }
+function updatePinDots(cid,n){ for(let i=0;i<4;i++) document.getElementById(cid==='pinDots'?`d${i}`:`sd${i}`).classList.toggle('filled',i<n); }
+function buildPinPad(pid,onD,onDel){ const p=document.getElementById(pid); p.innerHTML=''; [1,2,3,4,5,6,7,8,9,'',0,'⌫'].forEach(k=>{ const b=document.createElement('button'); b.className='pin-key'+(k==='⌫'?' del':''); b.textContent=k; if(k!=='') b.onclick=()=>k==='⌫'?onDel():onD(String(k)); else b.style.background='transparent'; p.appendChild(b); }); }
+
+buildPinPad('pinPad', d=>tryUnlock(d), ()=>{ pinEntry=pinEntry.slice(0,-1); updatePinDots('pinDots',pinEntry.length); });
+buildPinPad('setupPad', d=>{
+  if(setupEntry.length>=4) return;
+  setupEntry+=d; updatePinDots('setupDots',setupEntry.length);
   if(setupEntry.length===4){
-    if(setupPhase===0){setupFirst=setupEntry;setupEntry='';setupPhase=1;document.getElementById('setupError').textContent='Confirm your PIN';updatePinDots('setupDots',0);}
-    else{
-      if(setupEntry===setupFirst){storedPin=setupEntry;localStorage.setItem(PIN_KEY,storedPin);lockEnabled=true;localStorage.setItem(LOCK_KEY,'true');updateLockUI();document.getElementById('pinSetupOverlay').classList.remove('show');setupEntry='';setupPhase=0;setupFirst='';showShakeHint();}
-      else{document.getElementById('setupError').textContent="PINs don't match";setupEntry='';setupPhase=0;setupFirst='';updatePinDots('setupDots',0);}
+    if(setupPhase===0){ setupFirst=setupEntry; setupEntry=''; setupPhase=1; document.getElementById('setupError').textContent='Confirm your PIN'; updatePinDots('setupDots',0); }
+    else {
+      if(setupEntry===setupFirst){ storedPin=setupEntry; localStorage.setItem(PIN_KEY,storedPin); lockEnabled=true; localStorage.setItem(LOCK_KEY,'true'); updateLockUI(); document.getElementById('pinSetupOverlay').classList.remove('show'); setupEntry=''; setupPhase=0; setupFirst=''; showShakeHint(); }
+      else { document.getElementById('setupError').textContent="PINs don't match"; setupEntry=''; setupPhase=0; setupFirst=''; updatePinDots('setupDots',0); }
     }
   }
-},()=>{setupEntry=setupEntry.slice(0,-1);updatePinDots('setupDots',setupEntry.length);});
+}, ()=>{ setupEntry=setupEntry.slice(0,-1); updatePinDots('setupDots',setupEntry.length); });
 
-function updateLockUI(){const t=document.getElementById('lockToggle'),s=document.getElementById('lockSub');t.classList.toggle('on',lockEnabled);s.textContent=lockEnabled?'Shake phone to lock · PIN is set':'Shake phone to lock chat with PIN';}
+function updateLockUI(){ const t=document.getElementById('lockToggle'),s=document.getElementById('lockSub'); t.classList.toggle('on',lockEnabled); s.textContent=lockEnabled?'Shake phone to lock · PIN is set':'Shake phone to lock chat with PIN'; }
 updateLockUI();
 
 document.getElementById('lockToggle').onclick = async () => {
@@ -642,24 +729,19 @@ document.getElementById('lockToggle').onclick = async () => {
     if(window._needsMotionPermission){
       try{
         const perm = await DeviceMotionEvent.requestPermission();
-        if(perm === 'granted'){
-          attachShakeListener();
-          window._needsMotionPermission = false;
-        } else {
-          alert('Motion permission denied. Shake-to-lock requires motion access.');
-          return;
-        }
-      }catch(e){ console.warn('Motion permission error', e); }
+        if(perm==='granted'){ attachShakeListener(); window._needsMotionPermission=false; }
+        else { alert('Motion permission denied.'); return; }
+      }catch(e){}
     }
-    setupEntry='';setupPhase=0;setupFirst='';updatePinDots('setupDots',0);
+    setupEntry=''; setupPhase=0; setupFirst=''; updatePinDots('setupDots',0);
     document.getElementById('setupError').textContent='Enter a 4-digit PIN';
     document.getElementById('pinSetupOverlay').classList.add('show');
     document.getElementById('settingsOverlay').classList.remove('show');
   } else {
-    lockEnabled=false;storedPin='';localStorage.removeItem(PIN_KEY);localStorage.setItem(LOCK_KEY,'false');updateLockUI();
+    lockEnabled=false; storedPin=''; localStorage.removeItem(PIN_KEY); localStorage.setItem(LOCK_KEY,'false'); updateLockUI();
   }
 };
-document.getElementById('cancelPinSetup').onclick=()=>{document.getElementById('pinSetupOverlay').classList.remove('show');setupEntry='';setupPhase=0;};
+document.getElementById('cancelPinSetup').onclick = ()=>{ document.getElementById('pinSetupOverlay').classList.remove('show'); setupEntry=''; setupPhase=0; };
 
 /* ═══════════════════════════════════════════════════════════════════════════
    RENDER HELPERS
@@ -669,26 +751,19 @@ const _dlUrlMap = {};
 function renderMsg(role, text, imageUrl, isUserImg){
   const div = document.createElement('div');
   div.className = `msg ${role}`;
-
   let imgHtml = '';
   if(imageUrl){
     const safeUrl = imageUrl.startsWith('data:') ? imageUrl : escHtml(imageUrl);
     if(!isUserImg){
       const dlKey = '_dl_' + Date.now() + '_' + Math.random().toString(36).slice(2);
       _dlUrlMap[dlKey] = imageUrl;
-      imgHtml = `<div class="img-wrap">
-        <img src="${safeUrl}" alt="" loading="lazy">
-        <button class="dl-btn" data-dlkey="${dlKey}">
-          <svg fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-        </button>
-      </div>`;
+      imgHtml = `<div class="img-wrap"><img src="${safeUrl}" alt="" loading="lazy"><button class="dl-btn" data-dlkey="${dlKey}"><svg fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></button></div>`;
     } else {
       imgHtml = `<div class="img-wrap"><img src="${safeUrl}" alt="" loading="lazy"></div>`;
     }
   }
-
   div.innerHTML = `<div class="bubble"><span class="bubble-text"></span>${imgHtml}</div>`;
-  div.querySelector('.bubble-text').textContent = text;
+  div.querySelector('.bubble-text').textContent = text || '';
   viewport.appendChild(div);
   viewport.scrollTop = viewport.scrollHeight;
 }
@@ -705,25 +780,25 @@ function addMsg(role, text, imageUrl, isUserImg){
   messages.push(entry);
   renderMsg(role, text, imageUrl, isUserImg);
   persistCurrentMessages();
-  if(role === 'ai') autoNameSession();
+  if(role === 'ai' || role === 'assistant') autoNameSession();
 }
 
-function escHtml(s=''){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+function escHtml(s=''){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 
 function formatDate(ts){
-  const d=new Date(ts),dd=Math.floor((Date.now()-d)/86400000);
-  if(dd===0)return'Today · '+d.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
-  if(dd===1)return'Yesterday';
-  if(dd<7)return d.toLocaleDateString([],{weekday:'long'});
+  const d=new Date(ts), dd=Math.floor((Date.now()-d)/86400000);
+  if(dd===0) return 'Today · '+d.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
+  if(dd===1) return 'Yesterday';
+  if(dd<7)   return d.toLocaleDateString([],{weekday:'long'});
   return d.toLocaleDateString([],{day:'numeric',month:'short'});
 }
 
 async function dlImg(url){
   try{
-    if(url.startsWith('data:')){const a=document.createElement('a');a.href=url;a.download=`kiyana_${Date.now()}.jpg`;a.click();return;}
-    const r=await fetch(url);const blob=await r.blob();
-    const a=document.createElement('a');a.href=URL.createObjectURL(blob);
-    a.download=`kiyana_${Date.now()}.jpg`;document.body.appendChild(a);a.click();document.body.removeChild(a);
+    if(url.startsWith('data:')){ const a=document.createElement('a'); a.href=url; a.download=`kiyana_${Date.now()}.jpg`; a.click(); return; }
+    const r=await fetch(url); const blob=await r.blob();
+    const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=`kiyana_${Date.now()}.jpg`;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
   }catch(e){}
 }
 
@@ -734,75 +809,26 @@ function buildHistory(){
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   CHAT API
+   AUDIO CONTEXT (shared)
 ═══════════════════════════════════════════════════════════════════════════ */
-async function sendChat(text, base64){
-  thinkLabel.textContent='Thinking'; thinking.style.display='flex';
-  try{
-    const res=await fetch(`${API}/api/chat`,{
-      method:'POST', headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({message:text, imageBase64:base64||undefined, history:base64?undefined:buildHistory(), memory:globalMemory||undefined})
-    });
-    const data=await res.json();
-    if(!res.ok||data.error){addMsg('ai','Error: '+(data.error||'Something went wrong'));return null;}
-    return data.content;
-  }catch(e){addMsg('ai','Connection error: '+e.message);return null;}
-  finally{thinking.style.display='none';}
-}
-
-async function onSend(){
-  const text=msgInput.value.trim(); if(!text&&!pendingBase64)return;
-  const b64=pendingBase64; const imgSrc=b64?`data:image/jpeg;base64,${b64}`:null;
-  addMsg('user', text||'Analyzing image…', imgSrc, !!b64);
-  msgInput.value='';
-  requestAnimationFrame(() => { msgInput.style.height='auto'; });
-  pendingBase64=null; imgPreview.style.display='none';
-  const reply=await sendChat(text,b64);
-  if(reply){ addMsg('ai', reply); speakText(reply); }
-}
-
-async function onGenerate(){
-  const prompt=msgInput.value.trim(); if(!prompt)return;
-  addMsg('user','Generate image: '+prompt);
-  msgInput.value='';
-  requestAnimationFrame(() => { msgInput.style.height='auto'; });
-  thinkLabel.textContent='Painting'; thinking.style.display='flex';
-  try{
-    const res=await fetch(`${API}/api/generate-image`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({prompt})});
-    const data=await res.json();
-    if(!res.ok||data.error){addMsg('ai','Failed: '+(data.error||'Unknown'));return;}
-    if(data.url){addMsg('ai','Here is your generated image.',data.url);imgHistory.unshift({url:data.url,prompt,ts:Date.now()});saveImgs();}
-  }catch(e){addMsg('ai','Connection error: '+e.message);}
-  finally{thinking.style.display='none';}
-}
-
-/* ═══════════════════════════════════════════════════════════════════════════
-   VOICE INPUT + SPEAK REPLIES
-
-   Click mic button to start listening. VAD auto-stops on silence.
-   If "Speak Replies" is on, every AI reply is spoken via TTS.
-═══════════════════════════════════════════════════════════════════════════ */
-
-/* ── Shared audio context (one per page) ── */
 let audioCtx = null;
 function ensureAudioCtx(){
-  if(!audioCtx) audioCtx = new (window.AudioContext||window.webkitAudioContext)();
+  if(!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
   return audioCtx;
 }
 async function resumeAudioCtx(){
   const ctx = ensureAudioCtx();
-  if(ctx.state==='suspended') await ctx.resume();
+  if(ctx.state === 'suspended') await ctx.resume();
   return ctx;
 }
 
-/* ── Speak Replies setting ── */
-const SPEAK_KEY = 'kiyana_speak_replies';
-let speakReplies = localStorage.getItem(SPEAK_KEY) === 'true';
-let currentSource = null;
+/* ═══════════════════════════════════════════════════════════════════════════
+   SPEAK REPLIES
+═══════════════════════════════════════════════════════════════════════════ */
+let speakReplies   = localStorage.getItem(SPEAK_KEY) === 'true';
+let currentAudio   = null; /* always an HTMLAudioElement — works on Android WebView */
 
-function updateSpeakUI(){
-  document.getElementById('speakToggle').classList.toggle('on', speakReplies);
-}
+function updateSpeakUI(){ document.getElementById('speakToggle').classList.toggle('on', speakReplies); }
 updateSpeakUI();
 
 document.getElementById('speakToggle').onclick = () => {
@@ -813,15 +839,21 @@ document.getElementById('speakToggle').onclick = () => {
 };
 
 function stopCurrentAudio(){
-  if(currentSource){
-    try{ currentSource.stop(); }catch(e){}
-    try{ currentSource.disconnect(); }catch(e){}
-    currentSource = null;
+  if(currentAudio){
+    try{ currentAudio.pause(); }catch(e){}
+    try{ currentAudio.src = ''; }catch(e){}
+    currentAudio = null;
   }
 }
 
+/* ── speakText ──────────────────────────────────────────────────────────────
+   Uses <audio> element as the primary playback method.
+   This is required for Android WebView compatibility — AudioContext is
+   unreliable in WebView and silently fails without user gesture chains.
+   The server returns audio/mpeg (MP3) which <audio> handles natively.
+─────────────────────────────────────────────────────────────────────────── */
 async function speakText(text){
-  if(!speakReplies) return;
+  if(!speakReplies && !callActive) return;
   stopCurrentAudio();
   try{
     const res = await fetch(`${API}/api/tts`,{
@@ -831,45 +863,34 @@ async function speakText(text){
     if(!res.ok) return;
     const arrayBuf = await res.arrayBuffer();
     if(!arrayBuf || arrayBuf.byteLength < 100) return;
-    if(!speakReplies) return;
-    try{
-      const ctx = await resumeAudioCtx();
-      const audioBuffer = await ctx.decodeAudioData(arrayBuf.slice(0));
-      stopCurrentAudio();
-      if(!speakReplies) return;
-      await new Promise(resolve => {
-        const source = ctx.createBufferSource();
-        source.buffer = audioBuffer;
-        source.connect(ctx.destination);
-        currentSource = source;
-        source.onended = () => { source.disconnect(); if(currentSource===source) currentSource=null; resolve(); };
-        source.start(0);
-      });
-    }catch(decodeErr){
-      const blob = new Blob([arrayBuf],{type:'audio/mpeg'});
-      const url  = URL.createObjectURL(blob);
-      await new Promise((resolve)=>{
-        const audio = new Audio(url);
-        audio.onended = ()=>{ URL.revokeObjectURL(url); resolve(); };
-        audio.onerror = ()=>{ URL.revokeObjectURL(url); resolve(); };
-        audio.play().catch(()=>{ URL.revokeObjectURL(url); resolve(); });
-      });
-    }
+    if(!speakReplies && !callActive) return;
+
+    const blob = new Blob([arrayBuf], {type:'audio/mpeg'});
+    const url  = URL.createObjectURL(blob);
+    await new Promise(resolve => {
+      const audio   = new Audio(url);
+      audio.preload = 'auto';
+      currentAudio  = audio;
+      audio.onended = ()=>{ URL.revokeObjectURL(url); if(currentAudio===audio) currentAudio=null; resolve(); };
+      audio.onerror = ()=>{ URL.revokeObjectURL(url); if(currentAudio===audio) currentAudio=null; resolve(); };
+      audio.play().catch(()=>{ URL.revokeObjectURL(url); if(currentAudio===audio) currentAudio=null; resolve(); });
+    });
   }catch(e){}
 }
 
-/* ── Voice input state ── */
-let micRecording  = false;
-let micStream     = null;
-let micRecorder   = null;
-let micChunks     = [];
-let vadIv         = null;
-let vadAnalyser   = null;
-let silTimer      = null;
-let hasSpeech     = false;
-let speechTs      = 0;
+/* ═══════════════════════════════════════════════════════════════════════════
+   VOICE INPUT (text chat mic button)
+═══════════════════════════════════════════════════════════════════════════ */
+let micRecording = false;
+let micStream    = null;
+let micRecorder  = null;
+let micChunks    = [];
+let vadIv        = null;
+let vadAnalyser  = null;
+let silTimer     = null;
+let hasSpeech    = false;
+let speechTs     = 0;
 
-/* ── Mic button: click to start / click again to stop ── */
 const micBtn = document.getElementById('micBtn');
 micBtn.onclick = async () => {
   if(micRecording){ stopVoiceInput(true); return; }
@@ -891,12 +912,10 @@ async function startVoiceInput(){
   msgInput.placeholder = 'Listening…';
 
   const ctx = ensureAudioCtx();
-  vadAnalyser = ctx.createAnalyser();
-  vadAnalyser.fftSize = 512;
+  vadAnalyser = ctx.createAnalyser(); vadAnalyser.fftSize = 512;
   ctx.createMediaStreamSource(micStream).connect(vadAnalyser);
 
-  const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
-    ? 'audio/webm;codecs=opus' : 'audio/webm';
+  const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus') ? 'audio/webm;codecs=opus' : 'audio/webm';
   micRecorder = new MediaRecorder(micStream, {mimeType});
   micRecorder.ondataavailable = e => { if(e.data && e.data.size>0) micChunks.push(e.data); };
   micRecorder.start(100);
@@ -908,13 +927,11 @@ async function startVoiceInput(){
     let sum=0;
     for(let i=0;i<data.length;i++){ const v=(data[i]-128)/128; sum+=v*v; }
     const rms = Math.sqrt(sum/data.length)*100;
-    if(rms > 7){
+    if(rms>7){
       clearTimeout(silTimer); silTimer=null;
       if(!hasSpeech){ hasSpeech=true; speechTs=Date.now(); }
     } else if(hasSpeech && !silTimer){
-      silTimer = setTimeout(()=>{
-        if((Date.now()-speechTs) >= 400) stopVoiceInput(true);
-      }, 1300);
+      silTimer = setTimeout(()=>{ if((Date.now()-speechTs)>=400) stopVoiceInput(true); }, 1300);
     }
   }, 80);
 }
@@ -928,10 +945,7 @@ function stopVoiceInput(send=false){
   if(micStream){ micStream.getTracks().forEach(t=>t.stop()); micStream=null; }
   vadAnalyser=null;
   if(micRecorder && micRecorder.state!=='inactive'){
-    micRecorder.onstop = () => {
-      if(send && micChunks.length && hasSpeech) sendVoiceChunks(micChunks.slice());
-      micChunks=[];
-    };
+    micRecorder.onstop = ()=>{ if(send && micChunks.length && hasSpeech) sendVoiceChunks(micChunks.slice()); micChunks=[]; };
     micRecorder.stop();
   } else {
     micChunks=[];
@@ -954,88 +968,329 @@ async function sendVoiceChunks(chunks){
     const transcript = (sttData.transcript||'').trim();
     if(!transcript) return;
     msgInput.value = transcript;
-    msgInput.style.height = 'auto';
+    msgInput.style.height='auto';
     onSend();
+  }catch(e){ thinking.style.display='none'; }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   CHAT API
+═══════════════════════════════════════════════════════════════════════════ */
+async function sendChat(text, base64){
+  thinkLabel.textContent='Thinking'; thinking.style.display='flex';
+  try{
+    const res = await fetch(`${API}/api/chat`,{
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({message:text, imageBase64:base64||undefined, history:base64?undefined:buildHistory()})
+    });
+    const data = await res.json();
+    if(!res.ok || data.error){ addMsg('ai','Error: '+(data.error||'Something went wrong')); return null; }
+    return data.content;
+  }catch(e){ addMsg('ai','Connection error: '+e.message); return null; }
+  finally{ thinking.style.display='none'; }
+}
+
+async function onSend(){
+  const text = msgInput.value.trim();
+  if(!text && !pendingBase64) return;
+  const b64    = pendingBase64;
+  const imgSrc = b64 ? `data:image/jpeg;base64,${b64}` : null;
+  addMsg('user', text||'Analyzing image…', imgSrc, !!b64);
+  msgInput.value = '';
+  requestAnimationFrame(()=>{ msgInput.style.height='auto'; });
+  pendingBase64 = null; imgPreview.style.display='none';
+  const reply = await sendChat(text, b64);
+  if(reply){ addMsg('ai', reply); speakText(reply); }
+}
+
+async function onGenerate(){
+  const prompt = msgInput.value.trim();
+  if(!prompt) return;
+  addMsg('user','Generate image: '+prompt);
+  msgInput.value='';
+  requestAnimationFrame(()=>{ msgInput.style.height='auto'; });
+  thinkLabel.textContent='Painting'; thinking.style.display='flex';
+  try{
+    const res  = await fetch(`${API}/api/generate-image`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({prompt})});
+    const data = await res.json();
+    if(!res.ok||data.error){ addMsg('ai','Failed: '+(data.error||'Unknown')); return; }
+    if(data.url){ addMsg('ai','Here is your generated image.',data.url); imgHistory.unshift({url:data.url,prompt,ts:Date.now()}); saveImgs(); }
+  }catch(e){ addMsg('ai','Connection error: '+e.message); }
+  finally{ thinking.style.display='none'; }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   CALL MODE
+   ─────────────────────────────────────────────────────────────────────────
+   Flow:
+   1. User taps Call → overlay opens, mic starts listening (VAD)
+   2. Silence detected after speech → send to STT → show transcript in overlay
+   3. Send transcript to chat API → get reply
+   4. Play reply via TTS (avatar pulses while speaking)
+   5. After TTS done → avatar goes back to listening state (loop)
+   6. User taps Mute → mic pauses but call stays open
+   7. User taps End → call ends, messages saved to current session
+═══════════════════════════════════════════════════════════════════════════ */
+let callActive       = false;
+let callMuted        = false;
+let callProcessing   = false;
+let callStream       = null;
+let callRecorder     = null;
+let callChunks       = [];
+let callVadIv        = null;
+let callVadAnalyser  = null;
+let callSilTimer     = null;
+let callHasSpeech    = false;
+let callSpeechTs     = 0;
+let callMessages     = []; /* call's own message buffer (added to main session on end) */
+
+const callOverlay    = document.getElementById('callOverlay');
+const callAvatar     = document.getElementById('callAvatar');
+const callStatusEl   = document.getElementById('callStatus');
+const callTranscript = document.getElementById('callTranscript');
+const callMuteBtn    = document.getElementById('callMuteBtn');
+const callEndBtn     = document.getElementById('callEndBtn');
+const callSpeakerBtn = document.getElementById('callSpeakerBtn');
+const callBtn        = document.getElementById('callBtn');
+
+function setCallStatus(txt){ callStatusEl.textContent = txt; }
+function setCallTranscript(txt){ callTranscript.textContent = txt; }
+function setCallAvatarState(state){
+  callAvatar.classList.remove('speaking','listening');
+  if(state) callAvatar.classList.add(state);
+}
+
+callBtn.onclick = async () => {
+  if(callActive){ endCall(); return; }
+  await resumeAudioCtx();
+  startCall();
+};
+callEndBtn.onclick   = endCall;
+callMuteBtn.onclick  = toggleCallMute;
+callSpeakerBtn.onclick = () => {
+  callSpeakerBtn.classList.toggle('active');
+};
+
+async function startCall(){
+  callActive     = true;
+  callMuted      = false;
+  callProcessing = false;
+  callMessages   = [];
+
+  callOverlay.classList.add('show');
+  callBtn.classList.add('call-active');
+  callMuteBtn.classList.remove('active');
+  setCallStatus('Listening…');
+  setCallTranscript('');
+  setCallAvatarState('listening');
+
+  await startCallListening();
+}
+
+function endCall(){
+  callActive = false;
+  callOverlay.classList.remove('show');
+  callBtn.classList.remove('call-active');
+  setCallAvatarState(null);
+
+  stopCurrentAudio();
+  stopCallListening();
+
+  /* Flush call messages into the chat session so they appear in history */
+  if(callMessages.length){
+    callMessages.forEach(m => {
+      const entry = { role: m.role, text: m.text, imageUrl:null, isUserImg:false };
+      messages.push(entry);
+      renderMsg(m.role, m.text);
+    });
+    persistCurrentMessages();
+    autoNameSession();
+    viewport.scrollTop = viewport.scrollHeight;
+  }
+}
+
+function toggleCallMute(){
+  callMuted = !callMuted;
+  callMuteBtn.classList.toggle('active', callMuted);
+  if(callMuted){
+    setCallStatus('Muted');
+    setCallAvatarState(null);
+    stopCallListening();
+  } else {
+    setCallStatus('Listening…');
+    setCallAvatarState('listening');
+    if(!callProcessing) startCallListening();
+  }
+}
+
+async function startCallListening(){
+  if(!callActive || callMuted || callProcessing) return;
+  try{
+    callStream = await navigator.mediaDevices.getUserMedia({
+      audio:{ echoCancellation:true, noiseSuppression:true, autoGainControl:true }
+    });
   }catch(e){
-    thinking.style.display='none';
+    setCallStatus('Mic access denied');
+    endCall();
+    return;
+  }
+
+  callChunks = []; callHasSpeech = false;
+
+  const ctx       = ensureAudioCtx();
+  callVadAnalyser = ctx.createAnalyser(); callVadAnalyser.fftSize = 512;
+  ctx.createMediaStreamSource(callStream).connect(callVadAnalyser);
+
+  const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus') ? 'audio/webm;codecs=opus' : 'audio/webm';
+  callRecorder = new MediaRecorder(callStream, {mimeType});
+  callRecorder.ondataavailable = e => { if(e.data && e.data.size>0) callChunks.push(e.data); };
+  callRecorder.start(100);
+
+  const data = new Uint8Array(callVadAnalyser.fftSize);
+  callVadIv = setInterval(()=>{
+    if(!callActive || callMuted || callProcessing) return;
+    callVadAnalyser.getByteTimeDomainData(data);
+    let sum = 0;
+    for(let i=0;i<data.length;i++){ const v=(data[i]-128)/128; sum+=v*v; }
+    const rms = Math.sqrt(sum/data.length)*100;
+    if(rms>7){
+      clearTimeout(callSilTimer); callSilTimer=null;
+      if(!callHasSpeech){ callHasSpeech=true; callSpeechTs=Date.now(); }
+    } else if(callHasSpeech && !callSilTimer){
+      callSilTimer = setTimeout(()=>{
+        if((Date.now()-callSpeechTs)>=400) processCallSpeech();
+      }, 1300);
+    }
+  }, 80);
+}
+
+function stopCallListening(){
+  clearInterval(callVadIv); callVadIv=null;
+  clearTimeout(callSilTimer); callSilTimer=null;
+  if(callStream){ callStream.getTracks().forEach(t=>t.stop()); callStream=null; }
+  callVadAnalyser=null;
+  if(callRecorder && callRecorder.state!=='inactive'){
+    callRecorder.stop();
+  }
+  callRecorder=null;
+}
+
+async function processCallSpeech(){
+  if(!callActive || callMuted || callProcessing) return;
+  callProcessing = true;
+  setCallAvatarState(null);
+  setCallStatus('Transcribing…');
+
+  const chunks    = callChunks.slice();
+  const mimeType  = chunks[0]?.type || 'audio/webm';
+  stopCallListening();
+
+  const blob = new Blob(chunks,{type:mimeType});
+  if(blob.size < 800){
+    callProcessing = false;
+    if(!callMuted && callActive){ setCallStatus('Listening…'); setCallAvatarState('listening'); startCallListening(); }
+    return;
+  }
+
+  try{
+    const sttRes = await fetch(`${API}/api/stt`,{
+      method:'POST', headers:{'Content-Type':mimeType}, body:blob
+    });
+    if(!sttRes.ok) throw new Error('STT failed');
+    const sttData  = await sttRes.json();
+    const transcript = (sttData.transcript||'').trim();
+    if(!transcript){
+      callProcessing=false;
+      if(!callMuted&&callActive){ setCallStatus('Listening…'); setCallAvatarState('listening'); startCallListening(); }
+      return;
+    }
+
+    setCallTranscript(transcript);
+    setCallStatus('Kiyana is thinking…');
+    callMessages.push({ role:'user', text:transcript });
+
+    /* Build history from callMessages + existing messages */
+    const hist = [
+      ...buildHistory(),
+      ...callMessages.slice(0,-1).map(m=>({ role:m.role==='user'?'user':'assistant', content:m.text }))
+    ];
+
+    const chatRes  = await fetch(`${API}/api/chat`,{
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({ message:transcript, history:hist })
+    });
+    const chatData = await chatRes.json();
+    const reply    = chatData.content || '';
+
+    if(reply){
+      callMessages.push({ role:'ai', text:reply });
+      setCallTranscript(reply);
+      setCallStatus('Speaking…');
+      setCallAvatarState('speaking');
+      await speakText(reply);
+    }
+
+    setCallAvatarState(null);
+    callProcessing = false;
+    if(!callMuted && callActive){
+      setCallStatus('Listening…');
+      setCallTranscript('');
+      setCallAvatarState('listening');
+      startCallListening();
+    }
+  }catch(e){
+    callProcessing = false;
+    if(!callMuted && callActive){ setCallStatus('Listening…'); setCallAvatarState('listening'); startCallListening(); }
   }
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
    PERSIST ON HIDE
 ═══════════════════════════════════════════════════════════════════════════ */
-/* ═══════════════════════════════════════════════════════════════════════════
-   MEMORY — summarise completed sessions into a rolling memory blob
-═══════════════════════════════════════════════════════════════════════════ */
-let _memoryPending = false;
-
-async function updateMemory(msgs){
-  if(_memoryPending || !msgs || msgs.length < 2) return;
-  _memoryPending = true;
-  try{
-    const res = await fetch(`${API}/api/memory-summary`,{
-      method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ existingMemory: globalMemory, newMessages: msgs })
-    });
-    if(!res.ok) return;
-    const data = await res.json();
-    if(data.memory){ globalMemory = data.memory; localStorage.setItem(MEMORY_KEY, globalMemory); }
-  }catch(e){ console.log('Memory update failed:', e); }
-  finally{ _memoryPending = false; }
-}
-
-document.addEventListener('visibilitychange',()=>{
-  if(document.visibilityState==='hidden'){
-    persistCurrentMessages();
-    // fire-and-forget memory update when user leaves
-    if(messages.length >= 2) updateMemory(messages);
-  }
-});
+document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='hidden') persistCurrentMessages(); });
 window.addEventListener('pagehide', persistCurrentMessages);
 
 /* ═══════════════════════════════════════════════════════════════════════════
    SETTINGS / EVENTS
 ═══════════════════════════════════════════════════════════════════════════ */
-document.getElementById('settingsBtn').onclick    = ()=>document.getElementById('settingsOverlay').classList.add('show');
-document.getElementById('closeSettings').onclick  = ()=>document.getElementById('settingsOverlay').classList.remove('show');
-document.getElementById('settingsOverlay').onclick= e=>{if(e.target.id==='settingsOverlay')e.target.classList.remove('show');};
-document.getElementById('pinSetupOverlay').onclick= e=>{if(e.target.id==='pinSetupOverlay'){e.target.classList.remove('show');setupEntry='';setupPhase=0;}};
+document.getElementById('settingsBtn').onclick     = ()=>document.getElementById('settingsOverlay').classList.add('show');
+document.getElementById('closeSettings').onclick   = ()=>document.getElementById('settingsOverlay').classList.remove('show');
+document.getElementById('settingsOverlay').onclick = e=>{ if(e.target.id==='settingsOverlay') e.target.classList.remove('show'); };
+document.getElementById('pinSetupOverlay').onclick = e=>{ if(e.target.id==='pinSetupOverlay'){ e.target.classList.remove('show'); setupEntry=''; setupPhase=0; } };
 
-document.getElementById('analyzeBtn').onclick=()=>document.getElementById('fileInput').click();
-document.getElementById('fileInput').onchange=e=>{
-  const file=e.target.files[0]; if(!file)return;
+document.getElementById('analyzeBtn').onclick = ()=>document.getElementById('fileInput').click();
+document.getElementById('fileInput').onchange = e =>{
+  const file=e.target.files[0]; if(!file) return;
   const reader=new FileReader();
-  reader.onload=f=>{pendingBase64=f.target.result.split(',')[1];previewThumb.src=f.target.result;imgPreview.style.display='flex';msgInput.focus();};
+  reader.onload = f=>{ pendingBase64=f.target.result.split(',')[1]; previewThumb.src=f.target.result; imgPreview.style.display='flex'; msgInput.focus(); };
   reader.readAsDataURL(file); e.target.value='';
 };
-document.getElementById('clearImg').onclick=()=>{pendingBase64=null;imgPreview.style.display='none';};
-document.getElementById('genBtn').onclick =onGenerate;
-document.getElementById('sendBtn').onclick=onSend;
-msgInput.onkeydown=e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();onSend();}};
-msgInput.oninput=function(){
-  this.style.height='auto';
-  this.style.height=Math.min(this.scrollHeight,120)+'px';
-};
+document.getElementById('clearImg').onclick  = ()=>{ pendingBase64=null; imgPreview.style.display='none'; };
+document.getElementById('genBtn').onclick    = onGenerate;
+document.getElementById('sendBtn').onclick   = onSend;
+msgInput.onkeydown = e=>{ if(e.key==='Enter'&&!e.shiftKey){ e.preventDefault(); onSend(); } };
+msgInput.oninput   = function(){ this.style.height='auto'; this.style.height=Math.min(this.scrollHeight,120)+'px'; };
 
 /* ═══════════════════════════════════════════════════════════════════════════
    BOOT — restore last session or create new
 ═══════════════════════════════════════════════════════════════════════════ */
 (function boot(){
   if(sessions.length){
-    const s=sessions[0];
-    currentId=s.id;
-    messages=JSON.parse(JSON.stringify(s.messages));
+    const s = sessions[0];
+    currentId = s.id;
+    messages  = JSON.parse(JSON.stringify(s.messages));
     if(messages.length){
-      messages.forEach(m=>renderMsg(m.role,m.text,m.imageUrl,m.isUserImg));
-      viewport.scrollTop=viewport.scrollHeight;
+      messages.forEach(m=>renderMsg(m.role, m.text, m.imageUrl, m.isUserImg));
+      viewport.scrollTop = viewport.scrollHeight;
     } else {
-      renderMsg('ai',buildContextualGreeting());
+      renderMsg('ai', buildContextualGreeting());
       persistCurrentMessages();
     }
   } else {
     createNewSession();
   }
   renderSidebar();
+  updateHeaderChatName();
 })();
 </script>
 </body>
