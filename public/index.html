@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+5<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -404,6 +404,7 @@ const PIN_KEY       = 'kiyana_pin';
 const LOCK_KEY      = 'kiyana_lock_enabled';
 const LASTOPEN_KEY  = 'kiyana_last_open';
 const ACTIVE_ID_KEY = 'kiyana_active_id';
+const MEMORY_KEY    = 'kiyana_memory';
 
 // FIX: image history capped at 5 to prevent localStorage overflow (~1MB max)
 const MAX_IMG_HISTORY = 5;
@@ -416,6 +417,7 @@ let imgHistory   = JSON.parse(localStorage.getItem(IMG_KEY)      || '[]');
 let currentId    = null;
 let messages     = [];
 let pendingBase64= null;
+let globalMemory  = localStorage.getItem(MEMORY_KEY) || '';
 
 const viewport     = document.getElementById('viewport');
 const msgInput     = document.getElementById('msgInput');
@@ -439,6 +441,7 @@ function persistCurrentMessages(){
 }
 
 function createNewSession(){
+  if(messages.length >= 2) updateMemory(messages);
   const id  = Date.now();
   const s   = { id, name:'New Chat', ts:id, messages:[] };
   sessions.unshift(s);
@@ -455,55 +458,47 @@ function createNewSession(){
 async function autoNameSession(){
   const s = getSession(currentId);
   if(!s || s.name !== 'New Chat') return;
-  
-  // Count user messages - should be exactly 1 for first exchange
+
+  // Only trigger on the first real exchange (exactly 1 user message so far)
   const userMessages = messages.filter(m => m.role === 'user');
   if(userMessages.length !== 1) return;
-  
-  // Fallback: use first user message words if API fails
-  const fallbackName = () => {
-    const firstUser = userMessages[0]?.text || '';
-    const words = firstUser.trim().split(/\s+/).slice(0, 5).join(' ');
-    return words || 'Chat';
-  };
 
+  // Apply fallback name immediately so sidebar always updates fast
+  const firstUserText = userMessages[0]?.text || '';
+  const fallbackName  = firstUserText.trim().split(/\s+/).slice(0, 5).join(' ') || 'Chat';
+  s.name = fallbackName;
+  saveSessions();
+  renderSidebar();
+
+  // Then try to get a smarter AI-generated name
   try{
-    // Map 'ai' → 'assistant' so the API receives valid role values
     const formattedMessages = messages
       .filter(m => m.text)
-      .map(m => ({
-        role: m.role === 'user' ? 'user' : 'assistant',
-        content: m.text || ''
-      }));
-    
+      .map(m => ({ role: m.role === 'user' ? 'user' : 'assistant', content: m.text || '' }));
+
     const res = await fetch(`${API}/api/name-chat`,{
-      method:'POST', 
+      method:'POST',
       headers:{'Content-Type':'application/json'},
       body:JSON.stringify({ messages: formattedMessages })
     });
-    
-    if(!res.ok) throw new Error('API error');
+
+    if(!res.ok) return; // keep fallback
     const data = await res.json();
-    const name = data.name && data.name !== 'Chat' ? data.name : fallbackName();
-    if(s){ 
-      s.name = name; 
-      saveSessions(); 
-      renderSidebar(); 
+    const aiName = (data.name || '').trim();
+    // Only upgrade if we got something meaningful back
+    if(aiName && aiName.toLowerCase() !== 'chat' && aiName.toLowerCase() !== 'new chat'){
+      const fresh = getSession(currentId);
+      if(fresh){ fresh.name = aiName; saveSessions(); renderSidebar(); }
     }
   }catch(e){
-    // Fallback to first user message words
-    if(s && s.name === 'New Chat'){
-      s.name = fallbackName();
-      saveSessions();
-      renderSidebar();
-    }
-    console.log('Auto-name failed, used fallback:', e);
+    console.log('Auto-name AI call failed, using fallback:', e);
   }
 }
 
 function loadSession(id) {
   if (id === currentId) { closeSidebar(); return; }
   persistCurrentMessages();
+  if(messages.length >= 2) updateMemory(messages);
   const s = getSession(id);
   if (!s) return;
   currentId = id;
@@ -710,7 +705,7 @@ function addMsg(role, text, imageUrl, isUserImg){
   messages.push(entry);
   renderMsg(role, text, imageUrl, isUserImg);
   persistCurrentMessages();
-  if(role === 'assistant') autoNameSession();
+  if(role === 'ai') autoNameSession();
 }
 
 function escHtml(s=''){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
@@ -746,7 +741,7 @@ async function sendChat(text, base64){
   try{
     const res=await fetch(`${API}/api/chat`,{
       method:'POST', headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({message:text, imageBase64:base64||undefined, history:base64?undefined:buildHistory()})
+      body:JSON.stringify({message:text, imageBase64:base64||undefined, history:base64?undefined:buildHistory(), memory:globalMemory||undefined})
     });
     const data=await res.json();
     if(!res.ok||data.error){addMsg('ai','Error: '+(data.error||'Something went wrong'));return null;}
@@ -969,7 +964,33 @@ async function sendVoiceChunks(chunks){
 /* ═══════════════════════════════════════════════════════════════════════════
    PERSIST ON HIDE
 ═══════════════════════════════════════════════════════════════════════════ */
-document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='hidden') persistCurrentMessages(); });
+/* ═══════════════════════════════════════════════════════════════════════════
+   MEMORY — summarise completed sessions into a rolling memory blob
+═══════════════════════════════════════════════════════════════════════════ */
+let _memoryPending = false;
+
+async function updateMemory(msgs){
+  if(_memoryPending || !msgs || msgs.length < 2) return;
+  _memoryPending = true;
+  try{
+    const res = await fetch(`${API}/api/memory-summary`,{
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ existingMemory: globalMemory, newMessages: msgs })
+    });
+    if(!res.ok) return;
+    const data = await res.json();
+    if(data.memory){ globalMemory = data.memory; localStorage.setItem(MEMORY_KEY, globalMemory); }
+  }catch(e){ console.log('Memory update failed:', e); }
+  finally{ _memoryPending = false; }
+}
+
+document.addEventListener('visibilitychange',()=>{
+  if(document.visibilityState==='hidden'){
+    persistCurrentMessages();
+    // fire-and-forget memory update when user leaves
+    if(messages.length >= 2) updateMemory(messages);
+  }
+});
 window.addEventListener('pagehide', persistCurrentMessages);
 
 /* ═══════════════════════════════════════════════════════════════════════════
