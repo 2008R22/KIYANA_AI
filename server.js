@@ -6,21 +6,19 @@ const path    = require('path');
 const app  = express();
 const PORT = process.env.PORT || 3000;
 
-const GROQ_API_KEY        = process.env.GROQ_API_KEY;
-const FREEPIK_API_KEY     = process.env.FREEPIK_API_KEY;
-const ELEVENLABS_API_KEY  = process.env.ELEVENLABS_API_KEY;
-const ELEVENLABS_VOICE_ID = process.env.ELEVENLABS_VOICE_ID || 'cgSgspJ2msm6clMCkdW9';
-const DEEPGRAM_API_KEY    = process.env.DEEPGRAM_API_KEY;
+const GROQ_API_KEY    = process.env.GROQ_API_KEY;
+const FREEPIK_API_KEY = process.env.FREEPIK_API_KEY;
 
 app.use(cors());
 app.use(express.json({ limit: '20mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
 
+// ── Root ───────────────────────────────────────────────────────────────────────
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-/* ── Chat + Image Analysis ───────────────────────────────────────────────── */
+// ── Chat + Image Analysis ──────────────────────────────────────────────────────
 app.post('/api/chat', async (req, res) => {
   const { message, imageBase64, history } = req.body;
   if (!GROQ_API_KEY) return res.status(500).json({ error: 'GROQ_API_KEY not set' });
@@ -73,7 +71,7 @@ Keep responses conversational length unless asked to elaborate.`
   }
 });
 
-/* ── Auto-name a chat session ────────────────────────────────────────────── */
+// ── Auto-name a chat session ───────────────────────────────────────────────────
 app.post('/api/name-chat', async (req, res) => {
   const { messages } = req.body;
   if (!GROQ_API_KEY) return res.status(500).json({ error: 'GROQ_API_KEY not set' });
@@ -108,7 +106,6 @@ app.post('/api/name-chat', async (req, res) => {
     name = name.replace(/^["']|["']$/g, '').replace(/[.!?]$/, '');
     if (name.length > 30) name = name.substring(0, 30);
     if (!name || name.toLowerCase() === 'chat') name = 'New Chat';
-
     res.json({ name });
   } catch (err) {
     console.error('Name generation error:', err);
@@ -116,80 +113,7 @@ app.post('/api/name-chat', async (req, res) => {
   }
 });
 
-/* ── TTS via ElevenLabs ──────────────────────────────────────────────────── */
-app.post('/api/tts', async (req, res) => {
-  const { text } = req.body;
-  if (!ELEVENLABS_API_KEY) return res.status(500).json({ error: 'ELEVENLABS_API_KEY not set' });
-  if (!text) return res.status(400).json({ error: 'No text provided' });
-
-  try {
-    const ttsRes = await fetch(
-      `https://api.elevenlabs.io/v1/text-to-speech/${ELEVENLABS_VOICE_ID}?optimize_streaming_latency=3`,
-      {
-        method: 'POST',
-        headers: {
-          'xi-api-key': ELEVENLABS_API_KEY,
-          'Content-Type': 'application/json',
-          'Accept': 'audio/mpeg'
-        },
-        body: JSON.stringify({
-          text,
-          model_id: 'eleven_turbo_v2_5',
-          voice_settings: {
-            stability: 0.45,
-            similarity_boost: 0.85,
-            style: 0.2,
-            use_speaker_boost: true
-          }
-        })
-      }
-    );
-    if (!ttsRes.ok) {
-      const err = await ttsRes.text();
-      return res.status(502).json({ error: 'ElevenLabs error: ' + err });
-    }
-
-    const audioBuffer = await ttsRes.arrayBuffer();
-    res.set({
-      'Content-Type': 'audio/mpeg',
-      'Content-Length': audioBuffer.byteLength,
-      'Accept-Ranges': 'bytes'
-    });
-    res.send(Buffer.from(audioBuffer));
-  } catch (err) {
-    res.status(502).json({ error: err.message });
-  }
-});
-
-/* ── Speech to Text via Deepgram ─────────────────────────────────────────── */
-app.post('/api/stt', express.raw({ type: '*/*', limit: '20mb' }), async (req, res) => {
-  if (!DEEPGRAM_API_KEY) return res.status(500).json({ error: 'DEEPGRAM_API_KEY not set' });
-
-  const audioBuffer = req.body;
-  if (!audioBuffer || !audioBuffer.length) return res.json({ transcript: '' });
-
-  try {
-    const dgRes = await fetch(
-      'https://api.deepgram.com/v1/listen?model=nova-2&language=en&smart_format=true&punctuate=true',
-      {
-        method: 'POST',
-        headers: {
-          'Authorization': `Token ${DEEPGRAM_API_KEY}`,
-          'Content-Type': req.headers['content-type'] || 'audio/webm'
-        },
-        body: audioBuffer
-      }
-    );
-    const data = await dgRes.json();
-    if (!dgRes.ok) return res.status(502).json({ error: 'Deepgram error', detail: data });
-    const transcript = data?.results?.channels?.[0]?.alternatives?.[0]?.transcript || '';
-    res.json({ transcript });
-  } catch (err) {
-    res.status(502).json({ error: 'STT error: ' + err.message });
-  }
-});
-
-/* ── Image Generation ────────────────────────────────────────────────────── */
+// ── Image Generation ───────────────────────────────────────────────────────────
 app.post('/api/generate-image', async (req, res) => {
   const { prompt } = req.body;
   if (!FREEPIK_API_KEY) return res.status(500).json({ error: 'FREEPIK_API_KEY not set' });
@@ -216,7 +140,7 @@ app.post('/api/generate-image', async (req, res) => {
   }
 });
 
-/* ── Export for Vercel ───────────────────────────────────────────────────── */
+// ── Export for Vercel ──────────────────────────────────────────────────────────
 module.exports = app;
 
 if (require.main === module) {
